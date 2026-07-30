@@ -1,8 +1,8 @@
 # Flowdesk
 
-> B2B approval & workflow admin platform. Portfolio showcase project — see [PLAN.md](./PLAN.md) for the full build plan.
+> B2B approval & workflow admin platform. Portfolio showcase project.
 
-Work in progress. Full README (architecture decisions, screenshots, setup, tests) will be written on Day 14 per the plan.
+Work in progress.
 
 ## Repo structure
 
