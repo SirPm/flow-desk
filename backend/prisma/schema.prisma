@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  FINANCE
+}
+
+enum TaskAssignmentStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+enum ApprovalActionType {
+  APPROVE
+  REJECT
+  SKIP
+}
+
+enum ChangeRequestStatus {
+  PENDING
+  SCHEDULED
+  APPLIED
+  REJECTED
+}
+
+model Organization {
+  id           String   @id @default(cuid())
+  name         String
+  featureFlags Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users User[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  role           Role
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization       Organization       @relation(fields: [organizationId], references: [id])
+  createdTemplates   WorkflowTemplate[] @relation("WorkflowTemplateCreatedBy")
+  assignedTasks      TaskAssignment[]   @relation("TaskAssignmentAssignedTo")
+  requestedApprovals ApprovalRequest[]  @relation("ApprovalRequestRequestedBy")
+  approvalActions    ApprovalAction[]   @relation("ApprovalActionActor")
+  changeRequests     ChangeRequest[]    @relation("ChangeRequestEmployee")
+  auditLogs          AuditLog[]         @relation("AuditLogActor")
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+model WorkflowTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  steps     Role[]
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creator          User              @relation("WorkflowTemplateCreatedBy", fields: [createdBy], references: [id])
+  taskAssignments  TaskAssignment[]
+  approvalRequests ApprovalRequest[]
+
+  @@index([createdBy])
+  @@map("workflow_templates")
+}
+
+model TaskAssignment {
+  id            String               @id @default(cuid())
+  templateId    String
+  assignedTo    String
+  scheduledDate DateTime
+  status        TaskAssignmentStatus @default(PENDING)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  template WorkflowTemplate @relation(fields: [templateId], references: [id])
+  assignee User             @relation("TaskAssignmentAssignedTo", fields: [assignedTo], references: [id])
+
+  @@index([templateId])
+  @@index([assignedTo, status])
+  @@map("task_assignments")
+}
+
+model ApprovalRequest {
+  id                 String         @id @default(cuid())
+  workflowTemplateId String
+  currentStep        Int            @default(0)
+  status             ApprovalStatus @default(PENDING)
+  requestedBy        String
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  workflowTemplate WorkflowTemplate @relation(fields: [workflowTemplateId], references: [id])
+  requester        User             @relation("ApprovalRequestRequestedBy", fields: [requestedBy], references: [id])
+  actions          ApprovalAction[]
+
+  @@index([workflowTemplateId])
+  @@index([requestedBy])
+  @@index([status])
+  @@map("approval_requests")
+}
+
+model ApprovalAction {
+  id                String             @id @default(cuid())
+  approvalRequestId String
+  actorId           String
+  action            ApprovalActionType
+  timestamp         DateTime           @default(now())
+  note              String?
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id])
+  actor           User            @relation("ApprovalActionActor", fields: [actorId], references: [id])
+
+  @@index([approvalRequestId])
+  @@index([actorId])
+  @@map("approval_actions")
+}
+
+model ChangeRequest {
+  id            String              @id @default(cuid())
+  employeeId    String
+  fieldChanged  String
+  oldValue      String
+  newValue      String
+  effectiveDate DateTime
+  status        ChangeRequestStatus @default(PENDING)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  employee User @relation("ChangeRequestEmployee", fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([effectiveDate])
+  @@map("change_requests")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  action     String
+  entityType String
+  entityId   String
+  timestamp  DateTime @default(now())
+  metadata   Json     @default("{}")
+
+  actor User @relation("AuditLogActor", fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}

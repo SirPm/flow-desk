@@ -1,0 +1,14 @@
+{
+  "name": "flowdesk",
+  "private": true,
+  "version": "0.1.0",
+  "description": "B2B approval & workflow admin platform (portfolio showcase project)",
+  "scripts": {
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "npm --prefix backend test",
+    "test:frontend": "npm --prefix frontend test"
+  },
+  "engines": {
+    "node": ">=20 <21"
+  }
+}
