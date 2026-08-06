@@ -4,6 +4,7 @@ const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/workflows', label: 'Workflows' },
   { to: '/approvals', label: 'Approvals' },
+  { to: '/change-requests', label: 'Change Requests' },
   { to: '/audit-log', label: 'Audit Log' },
 ];
 

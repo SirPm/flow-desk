@@ -7,6 +7,7 @@ import { DashboardPage } from './features/dashboard/pages/DashboardPage';
 import { WorkflowsPage } from './features/workflows/pages/WorkflowsPage';
 import { ApprovalsPage } from './features/approvals/pages/ApprovalsPage';
 import { ApprovalRequestDetailPage } from './features/approvals/pages/ApprovalRequestDetailPage';
+import { ChangeRequestsPage } from './features/change-requests/pages/ChangeRequestsPage';
 import { AuditLogPage } from './features/audit-log/pages/AuditLogPage';
 
 function AppRoutes() {
@@ -19,6 +20,7 @@ function AppRoutes() {
           <Route path="/workflows" element={<WorkflowsPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/approvals/:id" element={<ApprovalRequestDetailPage />} />
+          <Route path="/change-requests" element={<ChangeRequestsPage />} />
           <Route path="/audit-log" element={<AuditLogPage />} />
         </Route>
       </Route>
