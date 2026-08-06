@@ -52,7 +52,11 @@ export function ApprovalsPage() {
                 >
                   <div>
                     <p className="text-sm font-medium text-slate-900">
-                      Step {request.currentStep + 1} of {request.workflowTemplate.steps.length}
+                      Step{' '}
+                      {request.status !== 'APPROVED'
+                        ? request.currentStep + 1
+                        : request.workflowTemplate.steps.length}{' '}
+                      of {request.workflowTemplate.steps.length}
                       {requiredRole ? ` · awaiting ${requiredRole}` : ''}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">Request {request.id}</p>
