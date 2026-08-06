@@ -35,6 +35,7 @@ changeRequestsRouter.post('/', authorize(Role.ADMIN, Role.MANAGER), async (req, 
   const request = await createChangeRequest({
     ...input,
     organizationId: req.user!.organizationId,
+    actorId: req.user!.sub,
   });
   res.status(201).json({ changeRequest: request });
 });
@@ -68,6 +69,7 @@ changeRequestsRouter.post('/:id/review', authorize(Role.ADMIN), async (req, res)
   const request = await reviewChangeRequest({
     id: req.params.id as string,
     organizationId: req.user!.organizationId,
+    actorId: req.user!.sub,
     decision: input.decision,
   });
   res.status(200).json({ changeRequest: request });

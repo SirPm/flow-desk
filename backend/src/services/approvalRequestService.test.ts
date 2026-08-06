@@ -130,6 +130,15 @@ describe('actOnApprovalRequest', () => {
       note: null,
     });
     jest.spyOn(prisma.approvalAction, 'findMany').mockResolvedValue([]);
+    jest.spyOn(prisma.auditLog, 'create').mockResolvedValue({
+      id: 'audit_1',
+      actorId: 'user_manager',
+      action: 'APPROVAL_APPROVE',
+      entityType: 'ApprovalRequest',
+      entityId: 'req_1',
+      timestamp: now,
+      metadata: {},
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     jest.spyOn(prisma, '$transaction').mockImplementation((fn: any) => fn(prisma));
 
@@ -150,6 +159,17 @@ describe('actOnApprovalRequest', () => {
         data: expect.objectContaining({
           actorId: 'user_manager',
           action: ApprovalActionType.APPROVE,
+        }),
+      }),
+    );
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 'user_manager',
+          action: 'APPROVAL_APPROVE',
+          entityType: 'ApprovalRequest',
+          entityId: 'req_1',
+          metadata: expect.objectContaining({ permissionOverride: false }),
         }),
       }),
     );

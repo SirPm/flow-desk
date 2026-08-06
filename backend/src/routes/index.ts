@@ -5,6 +5,8 @@ import { workflowTemplatesRouter } from './workflowTemplates.routes';
 import { approvalRequestsRouter } from './approvalRequests.routes';
 import { changeRequestsRouter } from './changeRequests.routes';
 import { usersRouter } from './users.routes';
+import { auditLogRouter } from './auditLog.routes';
+import { organizationsRouter } from './organizations.routes';
 
 export const apiRouter = Router();
 
@@ -14,3 +16,5 @@ apiRouter.use('/workflow-templates', workflowTemplatesRouter);
 apiRouter.use('/approval-requests', approvalRequestsRouter);
 apiRouter.use('/change-requests', changeRequestsRouter);
 apiRouter.use('/users', usersRouter);
+apiRouter.use('/audit-log', auditLogRouter);
+apiRouter.use('/organizations', organizationsRouter);

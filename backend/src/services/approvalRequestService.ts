@@ -1,13 +1,14 @@
 import {
   ApprovalActionType,
   ApprovalStatus,
+  Role,
   type ApprovalAction,
   type ApprovalRequest,
-  type Role,
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError } from '../lib/errors';
 import { advanceApprovalRequest } from './approvalEngine';
+import { logAction } from './auditLogger';
 
 export interface CreateApprovalRequestInput {
   workflowTemplateId: string;
@@ -101,6 +102,8 @@ export async function actOnApprovalRequest(
     throw new NotFoundError('Approval request not found');
   }
 
+  const requiredRole = request.workflowTemplate.steps[request.currentStep];
+
   const result = advanceApprovalRequest({
     request: { currentStep: request.currentStep, status: request.status },
     steps: request.workflowTemplate.steps,
@@ -127,6 +130,21 @@ export async function actOnApprovalRequest(
       where: { approvalRequestId: input.id },
       orderBy: { timestamp: 'asc' },
     });
+
+    await logAction(
+      {
+        actorId: input.actorId,
+        action: `APPROVAL_${result.actionType}`,
+        entityType: 'ApprovalRequest',
+        entityId: input.id,
+        metadata: {
+          decision: result.actionType,
+          note: input.note,
+          permissionOverride: input.actorRole === Role.ADMIN && requiredRole !== input.actorRole,
+        },
+      },
+      tx,
+    );
 
     return { ...updated, actions };
   });

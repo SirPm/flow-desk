@@ -1,6 +1,7 @@
 import { ChangeRequestStatus, type ChangeRequest } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError, ValidationError } from '../lib/errors';
+import { logAction } from './auditLogger';
 
 export interface CreateChangeRequestInput {
   employeeId: string;
@@ -9,6 +10,7 @@ export interface CreateChangeRequestInput {
   newValue: string;
   effectiveDate: Date;
   organizationId: string;
+  actorId: string;
 }
 
 export async function createChangeRequest(input: CreateChangeRequestInput): Promise<ChangeRequest> {
@@ -17,14 +19,29 @@ export async function createChangeRequest(input: CreateChangeRequestInput): Prom
     throw new NotFoundError('Employee not found');
   }
 
-  return prisma.changeRequest.create({
-    data: {
-      employeeId: input.employeeId,
-      fieldChanged: input.fieldChanged,
-      oldValue: input.oldValue,
-      newValue: input.newValue,
-      effectiveDate: input.effectiveDate,
-    },
+  return prisma.$transaction(async (tx) => {
+    const request = await tx.changeRequest.create({
+      data: {
+        employeeId: input.employeeId,
+        fieldChanged: input.fieldChanged,
+        oldValue: input.oldValue,
+        newValue: input.newValue,
+        effectiveDate: input.effectiveDate,
+      },
+    });
+
+    await logAction(
+      {
+        actorId: input.actorId,
+        action: 'CHANGE_REQUEST_CREATED',
+        entityType: 'ChangeRequest',
+        entityId: request.id,
+        metadata: { employeeId: request.employeeId, fieldChanged: request.fieldChanged },
+      },
+      tx,
+    );
+
+    return request;
   });
 }
 
@@ -73,6 +90,7 @@ export type ChangeRequestDecision = 'APPROVE' | 'REJECT';
 export interface ReviewChangeRequestInput {
   id: string;
   organizationId: string;
+  actorId: string;
   decision: ChangeRequestDecision;
 }
 
@@ -93,8 +111,23 @@ export async function reviewChangeRequest(input: ReviewChangeRequestInput): Prom
   const status =
     input.decision === 'APPROVE' ? ChangeRequestStatus.SCHEDULED : ChangeRequestStatus.REJECTED;
 
-  return prisma.changeRequest.update({
-    where: { id: input.id },
-    data: { status },
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.changeRequest.update({
+      where: { id: input.id },
+      data: { status },
+    });
+
+    await logAction(
+      {
+        actorId: input.actorId,
+        action:
+          input.decision === 'APPROVE' ? 'CHANGE_REQUEST_APPROVED' : 'CHANGE_REQUEST_REJECTED',
+        entityType: 'ChangeRequest',
+        entityId: input.id,
+      },
+      tx,
+    );
+
+    return updated;
   });
 }

@@ -1,21 +1,28 @@
 import { NavLink } from 'react-router-dom';
-
-const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/workflows', label: 'Workflows' },
-  { to: '/approvals', label: 'Approvals' },
-  { to: '/change-requests', label: 'Change Requests' },
-  { to: '/audit-log', label: 'Audit Log' },
-];
+import { useAppSelector } from '../../app/hooks';
+import { useOrganization } from '../../features/organization/hooks/useOrganization';
 
 export function Sidebar() {
+  const role = useAppSelector((state) => state.auth.user?.role);
+  const { data: organization } = useOrganization();
+  const changeRequestsEnabled = organization?.featureFlags.changeRequests !== false;
+
+  const navItems = [
+    { to: '/dashboard', label: 'Dashboard', show: true },
+    { to: '/workflows', label: 'Workflows', show: true },
+    { to: '/approvals', label: 'Approvals', show: true },
+    { to: '/change-requests', label: 'Change Requests', show: changeRequestsEnabled },
+    { to: '/audit-log', label: 'Audit Log', show: role === 'ADMIN' },
+    { to: '/feature-flags', label: 'Feature Flags', show: role === 'ADMIN' },
+  ].filter((item) => item.show);
+
   return (
     <aside className="w-56 shrink-0 border-r border-slate-200 bg-white">
       <div className="flex h-14 items-center border-b border-slate-200 px-4">
         <span className="text-lg font-semibold text-slate-900">Flowdesk</span>
       </div>
       <nav className="flex flex-col gap-1 p-3">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

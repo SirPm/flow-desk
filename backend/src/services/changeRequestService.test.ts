@@ -21,6 +21,23 @@ const employee = {
   updatedAt: now,
 };
 
+function mockTransaction() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  jest.spyOn(prisma, '$transaction').mockImplementation((fn: any) => fn(prisma));
+}
+
+function mockAuditLog() {
+  jest.spyOn(prisma.auditLog, 'create').mockResolvedValue({
+    id: 'audit_1',
+    actorId: 'user_admin',
+    action: 'TEST',
+    entityType: 'ChangeRequest',
+    entityId: 'cr_1',
+    timestamp: now,
+    metadata: {},
+  });
+}
+
 describe('createChangeRequest', () => {
   it('rejects an employee from a different organization', async () => {
     jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(employee);
@@ -33,12 +50,15 @@ describe('createChangeRequest', () => {
         newValue: 'Senior Associate',
         effectiveDate,
         organizationId: 'org_2',
+        actorId: 'user_admin',
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('creates a pending change request', async () => {
+  it('creates a pending change request and logs it', async () => {
     jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(employee);
+    mockTransaction();
+    mockAuditLog();
     jest.spyOn(prisma.changeRequest, 'create').mockResolvedValue({
       id: 'cr_1',
       employeeId: 'user_employee',
@@ -58,6 +78,7 @@ describe('createChangeRequest', () => {
       newValue: 'Senior Associate',
       effectiveDate,
       organizationId: 'org_1',
+      actorId: 'user_admin',
     });
 
     expect(prisma.changeRequest.create).toHaveBeenCalledWith(
@@ -68,6 +89,16 @@ describe('createChangeRequest', () => {
           oldValue: 'Associate',
           newValue: 'Senior Associate',
           effectiveDate,
+        }),
+      }),
+    );
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 'user_admin',
+          action: 'CHANGE_REQUEST_CREATED',
+          entityType: 'ChangeRequest',
+          entityId: 'cr_1',
         }),
       }),
     );
@@ -111,8 +142,10 @@ describe('reviewChangeRequest', () => {
     employee: { organizationId: 'org_1' },
   };
 
-  it('approves a pending request into scheduled status', async () => {
+  it('approves a pending request into scheduled status and logs it', async () => {
     jest.spyOn(prisma.changeRequest, 'findUnique').mockResolvedValue(pendingRequest);
+    mockTransaction();
+    mockAuditLog();
     jest
       .spyOn(prisma.changeRequest, 'update')
       .mockResolvedValue({ ...pendingRequest, status: ChangeRequestStatus.SCHEDULED });
@@ -120,6 +153,7 @@ describe('reviewChangeRequest', () => {
     const result = await reviewChangeRequest({
       id: 'cr_1',
       organizationId: 'org_1',
+      actorId: 'user_admin',
       decision: 'APPROVE',
     });
 
@@ -127,11 +161,23 @@ describe('reviewChangeRequest', () => {
       where: { id: 'cr_1' },
       data: { status: ChangeRequestStatus.SCHEDULED },
     });
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 'user_admin',
+          action: 'CHANGE_REQUEST_APPROVED',
+          entityType: 'ChangeRequest',
+          entityId: 'cr_1',
+        }),
+      }),
+    );
     expect(result.status).toBe(ChangeRequestStatus.SCHEDULED);
   });
 
   it('rejects a pending request into rejected status', async () => {
     jest.spyOn(prisma.changeRequest, 'findUnique').mockResolvedValue(pendingRequest);
+    mockTransaction();
+    mockAuditLog();
     jest
       .spyOn(prisma.changeRequest, 'update')
       .mockResolvedValue({ ...pendingRequest, status: ChangeRequestStatus.REJECTED });
@@ -139,6 +185,7 @@ describe('reviewChangeRequest', () => {
     const result = await reviewChangeRequest({
       id: 'cr_1',
       organizationId: 'org_1',
+      actorId: 'user_admin',
       decision: 'REJECT',
     });
 
@@ -149,7 +196,12 @@ describe('reviewChangeRequest', () => {
     jest.spyOn(prisma.changeRequest, 'findUnique').mockResolvedValue(pendingRequest);
 
     await expect(
-      reviewChangeRequest({ id: 'cr_1', organizationId: 'org_2', decision: 'APPROVE' }),
+      reviewChangeRequest({
+        id: 'cr_1',
+        organizationId: 'org_2',
+        actorId: 'user_admin',
+        decision: 'APPROVE',
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
@@ -160,7 +212,12 @@ describe('reviewChangeRequest', () => {
     });
 
     await expect(
-      reviewChangeRequest({ id: 'cr_1', organizationId: 'org_1', decision: 'APPROVE' }),
+      reviewChangeRequest({
+        id: 'cr_1',
+        organizationId: 'org_1',
+        actorId: 'user_admin',
+        decision: 'APPROVE',
+      }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 });

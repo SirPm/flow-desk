@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppSelector } from '../../../app/hooks';
 import { EmptyState } from '../../../components/EmptyState';
+import { useOrganization } from '../../organization/hooks/useOrganization';
 import { useChangeRequests } from '../hooks/useChangeRequests';
 import { useReviewChangeRequest } from '../hooks/useReviewChangeRequest';
 import { EditEmployeeInfoForm } from '../components/EditEmployeeInfoForm';
@@ -17,15 +18,29 @@ const STATUS_FILTERS: { label: string; value: ChangeRequestStatus | undefined }[
 
 export function ChangeRequestsPage() {
   const role = useAppSelector((state) => state.auth.user?.role);
+  const { data: organization } = useOrganization();
   const [status, setStatus] = useState<ChangeRequestStatus | undefined>(undefined);
   const { data: requests, isLoading, isError } = useChangeRequests({ status });
   const reviewChangeRequest = useReviewChangeRequest();
 
   const canCreate = role === 'ADMIN' || role === 'MANAGER';
   const canReview = role === 'ADMIN';
+  const changeRequestsEnabled = organization?.featureFlags.changeRequests !== false;
 
   function handleReview(id: string, decision: ChangeRequestDecision) {
     reviewChangeRequest.mutate({ id, decision });
+  }
+
+  if (!changeRequestsEnabled) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="text-xl font-semibold text-slate-900">Change Requests</h1>
+        <EmptyState
+          title="Feature disabled"
+          description="Change requests are currently disabled for your organization."
+        />
+      </div>
+    );
   }
 
   return (

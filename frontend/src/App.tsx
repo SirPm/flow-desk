@@ -9,6 +9,7 @@ import { ApprovalsPage } from './features/approvals/pages/ApprovalsPage';
 import { ApprovalRequestDetailPage } from './features/approvals/pages/ApprovalRequestDetailPage';
 import { ChangeRequestsPage } from './features/change-requests/pages/ChangeRequestsPage';
 import { AuditLogPage } from './features/audit-log/pages/AuditLogPage';
+import { FeatureFlagsPage } from './features/organization/pages/FeatureFlagsPage';
 
 function AppRoutes() {
   return (
@@ -22,6 +23,7 @@ function AppRoutes() {
           <Route path="/approvals/:id" element={<ApprovalRequestDetailPage />} />
           <Route path="/change-requests" element={<ChangeRequestsPage />} />
           <Route path="/audit-log" element={<AuditLogPage />} />
+          <Route path="/feature-flags" element={<FeatureFlagsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
