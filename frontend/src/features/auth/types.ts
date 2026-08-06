@@ -1,5 +1,7 @@
 export type Role = 'ADMIN' | 'MANAGER' | 'EMPLOYEE' | 'FINANCE';
 
+export const ALL_ROLES: Role[] = ['ADMIN', 'MANAGER', 'EMPLOYEE', 'FINANCE'];
+
 export interface AuthUser {
   id: string;
   name: string;

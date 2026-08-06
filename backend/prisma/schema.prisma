@@ -47,7 +47,8 @@ model Organization {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  users User[]
+  users             User[]
+  workflowTemplates WorkflowTemplate[]
 
   @@map("organizations")
 }
@@ -75,18 +76,21 @@ model User {
 }
 
 model WorkflowTemplate {
-  id        String   @id @default(cuid())
-  name      String
-  steps     Role[]
-  createdBy String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String
+  steps          Role[]
+  createdBy      String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   creator          User              @relation("WorkflowTemplateCreatedBy", fields: [createdBy], references: [id])
+  organization     Organization      @relation(fields: [organizationId], references: [id])
   taskAssignments  TaskAssignment[]
   approvalRequests ApprovalRequest[]
 
   @@index([createdBy])
+  @@index([organizationId])
   @@map("workflow_templates")
 }
 
