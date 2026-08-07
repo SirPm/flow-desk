@@ -1,4 +1,4 @@
-import { ChangeRequestStatus, Role } from '@prisma/client';
+import { ChangeRequestField, ChangeRequestStatus, Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import {
   createChangeRequest,
@@ -17,6 +17,10 @@ const employee = {
   passwordHash: 'hash',
   role: Role.EMPLOYEE,
   organizationId: 'org_1',
+  departmentId: null,
+  positionId: null,
+  salary: null,
+  employmentType: null,
   createdAt: now,
   updatedAt: now,
 };
@@ -45,14 +49,63 @@ describe('createChangeRequest', () => {
     await expect(
       createChangeRequest({
         employeeId: 'user_employee',
-        fieldChanged: 'position',
-        oldValue: 'Associate',
-        newValue: 'Senior Associate',
+        fieldChanged: ChangeRequestField.SALARY,
+        oldValue: '65000',
+        newValue: '72000',
         effectiveDate,
         organizationId: 'org_2',
         actorId: 'user_admin',
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('rejects a salary newValue that is not a non-negative integer', async () => {
+    jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(employee);
+
+    await expect(
+      createChangeRequest({
+        employeeId: 'user_employee',
+        fieldChanged: ChangeRequestField.SALARY,
+        oldValue: '',
+        newValue: 'not-a-number',
+        effectiveDate,
+        organizationId: 'org_1',
+        actorId: 'user_admin',
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('rejects an employment type newValue outside the fixed enum', async () => {
+    jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(employee);
+
+    await expect(
+      createChangeRequest({
+        employeeId: 'user_employee',
+        fieldChanged: ChangeRequestField.EMPLOYMENT_TYPE,
+        oldValue: '',
+        newValue: 'FREELANCE',
+        effectiveDate,
+        organizationId: 'org_1',
+        actorId: 'user_admin',
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('rejects a position newValue that does not belong to the organization', async () => {
+    jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(employee);
+    jest.spyOn(prisma.position, 'findUnique').mockResolvedValue(null);
+
+    await expect(
+      createChangeRequest({
+        employeeId: 'user_employee',
+        fieldChanged: ChangeRequestField.POSITION,
+        oldValue: '',
+        newValue: 'pos_unknown',
+        effectiveDate,
+        organizationId: 'org_1',
+        actorId: 'user_admin',
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 
   it('creates a pending change request and logs it', async () => {
@@ -62,9 +115,9 @@ describe('createChangeRequest', () => {
     jest.spyOn(prisma.changeRequest, 'create').mockResolvedValue({
       id: 'cr_1',
       employeeId: 'user_employee',
-      fieldChanged: 'position',
-      oldValue: 'Associate',
-      newValue: 'Senior Associate',
+      fieldChanged: ChangeRequestField.EMPLOYMENT_TYPE,
+      oldValue: '',
+      newValue: 'FULL_TIME',
       effectiveDate,
       status: ChangeRequestStatus.PENDING,
       createdAt: now,
@@ -73,9 +126,9 @@ describe('createChangeRequest', () => {
 
     const result = await createChangeRequest({
       employeeId: 'user_employee',
-      fieldChanged: 'position',
-      oldValue: 'Associate',
-      newValue: 'Senior Associate',
+      fieldChanged: ChangeRequestField.EMPLOYMENT_TYPE,
+      oldValue: '',
+      newValue: 'FULL_TIME',
       effectiveDate,
       organizationId: 'org_1',
       actorId: 'user_admin',
@@ -85,9 +138,9 @@ describe('createChangeRequest', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           employeeId: 'user_employee',
-          fieldChanged: 'position',
-          oldValue: 'Associate',
-          newValue: 'Senior Associate',
+          fieldChanged: ChangeRequestField.EMPLOYMENT_TYPE,
+          oldValue: '',
+          newValue: 'FULL_TIME',
           effectiveDate,
         }),
       }),
@@ -132,9 +185,9 @@ describe('reviewChangeRequest', () => {
   const pendingRequest = {
     id: 'cr_1',
     employeeId: 'user_employee',
-    fieldChanged: 'position',
-    oldValue: 'Associate',
-    newValue: 'Senior Associate',
+    fieldChanged: ChangeRequestField.EMPLOYMENT_TYPE,
+    oldValue: '',
+    newValue: 'FULL_TIME',
     effectiveDate,
     status: ChangeRequestStatus.PENDING,
     createdAt: now,
@@ -172,6 +225,59 @@ describe('reviewChangeRequest', () => {
       }),
     );
     expect(result.status).toBe(ChangeRequestStatus.SCHEDULED);
+  });
+
+  it('applies a request immediately when its effective date is today or earlier', async () => {
+    const dueRequest = {
+      ...pendingRequest,
+      fieldChanged: ChangeRequestField.SALARY,
+      newValue: '80000',
+      effectiveDate: now,
+    };
+    jest.spyOn(prisma.changeRequest, 'findUnique').mockResolvedValue(dueRequest);
+    mockTransaction();
+    mockAuditLog();
+    jest.spyOn(prisma.user, 'update').mockResolvedValue(employee);
+    jest
+      .spyOn(prisma.changeRequest, 'update')
+      .mockResolvedValue({ ...dueRequest, status: ChangeRequestStatus.APPLIED });
+
+    const result = await reviewChangeRequest({
+      id: 'cr_1',
+      organizationId: 'org_1',
+      actorId: 'user_admin',
+      decision: 'APPROVE',
+    });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user_employee' },
+      data: { salary: 80000 },
+    });
+    expect(prisma.changeRequest.update).toHaveBeenCalledWith({
+      where: { id: 'cr_1' },
+      data: { status: ChangeRequestStatus.APPLIED },
+    });
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 'user_admin',
+          action: 'CHANGE_REQUEST_APPROVED',
+          entityType: 'ChangeRequest',
+          entityId: 'cr_1',
+        }),
+      }),
+    );
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          actorId: 'user_admin',
+          action: 'CHANGE_REQUEST_APPLIED',
+          entityType: 'ChangeRequest',
+          entityId: 'cr_1',
+        }),
+      }),
+    );
+    expect(result.status).toBe(ChangeRequestStatus.APPLIED);
   });
 
   it('rejects a pending request into rejected status', async () => {

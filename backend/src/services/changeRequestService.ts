@@ -1,11 +1,12 @@
-import { ChangeRequestStatus, type ChangeRequest } from '@prisma/client';
+import { ChangeRequestField, ChangeRequestStatus, EmploymentType, type ChangeRequest } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { logAction } from './auditLogger';
+import { buildUserUpdateData } from './scheduling';
 
 export interface CreateChangeRequestInput {
   employeeId: string;
-  fieldChanged: string;
+  fieldChanged: ChangeRequestField;
   oldValue: string;
   newValue: string;
   effectiveDate: Date;
@@ -13,11 +14,58 @@ export interface CreateChangeRequestInput {
   actorId: string;
 }
 
+async function assertValidFieldValue(
+  fieldChanged: ChangeRequestField,
+  value: string,
+  organizationId: string,
+  { allowEmpty }: { allowEmpty: boolean },
+): Promise<void> {
+  if (allowEmpty && value === '') {
+    return;
+  }
+
+  switch (fieldChanged) {
+    case ChangeRequestField.POSITION: {
+      const position = await prisma.position.findUnique({ where: { id: value } });
+      if (!position || position.organizationId !== organizationId) {
+        throw new ValidationError('Value must be a valid position id for this organization');
+      }
+      return;
+    }
+    case ChangeRequestField.DEPARTMENT: {
+      const department = await prisma.department.findUnique({ where: { id: value } });
+      if (!department || department.organizationId !== organizationId) {
+        throw new ValidationError('Value must be a valid department id for this organization');
+      }
+      return;
+    }
+    case ChangeRequestField.SALARY: {
+      if (!/^\d+$/.test(value)) {
+        throw new ValidationError('Value must be a non-negative integer salary');
+      }
+      return;
+    }
+    case ChangeRequestField.EMPLOYMENT_TYPE: {
+      if (!(Object.values(EmploymentType) as string[]).includes(value)) {
+        throw new ValidationError('Value must be one of FULL_TIME, PART_TIME, CONTRACT');
+      }
+      return;
+    }
+  }
+}
+
 export async function createChangeRequest(input: CreateChangeRequestInput): Promise<ChangeRequest> {
   const employee = await prisma.user.findUnique({ where: { id: input.employeeId } });
   if (!employee || employee.organizationId !== input.organizationId) {
     throw new NotFoundError('Employee not found');
   }
+
+  await assertValidFieldValue(input.fieldChanged, input.oldValue, input.organizationId, {
+    allowEmpty: true,
+  });
+  await assertValidFieldValue(input.fieldChanged, input.newValue, input.organizationId, {
+    allowEmpty: false,
+  });
 
   return prisma.$transaction(async (tx) => {
     const request = await tx.changeRequest.create({
@@ -108,10 +156,38 @@ export async function reviewChangeRequest(input: ReviewChangeRequestInput): Prom
     throw new ValidationError('Only pending change requests can be reviewed');
   }
 
-  const status =
-    input.decision === 'APPROVE' ? ChangeRequestStatus.SCHEDULED : ChangeRequestStatus.REJECTED;
+  if (input.decision === 'REJECT') {
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.changeRequest.update({
+        where: { id: input.id },
+        data: { status: ChangeRequestStatus.REJECTED },
+      });
+
+      await logAction(
+        {
+          actorId: input.actorId,
+          action: 'CHANGE_REQUEST_REJECTED',
+          entityType: 'ChangeRequest',
+          entityId: input.id,
+        },
+        tx,
+      );
+
+      return updated;
+    });
+  }
+
+  const isEffectiveImmediately = request.effectiveDate <= new Date();
+  const status = isEffectiveImmediately ? ChangeRequestStatus.APPLIED : ChangeRequestStatus.SCHEDULED;
 
   return prisma.$transaction(async (tx) => {
+    if (isEffectiveImmediately) {
+      await tx.user.update({
+        where: { id: request.employeeId },
+        data: buildUserUpdateData(request.fieldChanged, request.newValue),
+      });
+    }
+
     const updated = await tx.changeRequest.update({
       where: { id: input.id },
       data: { status },
@@ -120,13 +196,30 @@ export async function reviewChangeRequest(input: ReviewChangeRequestInput): Prom
     await logAction(
       {
         actorId: input.actorId,
-        action:
-          input.decision === 'APPROVE' ? 'CHANGE_REQUEST_APPROVED' : 'CHANGE_REQUEST_REJECTED',
+        action: 'CHANGE_REQUEST_APPROVED',
         entityType: 'ChangeRequest',
         entityId: input.id,
       },
       tx,
     );
+
+    if (isEffectiveImmediately) {
+      await logAction(
+        {
+          actorId: input.actorId,
+          action: 'CHANGE_REQUEST_APPLIED',
+          entityType: 'ChangeRequest',
+          entityId: input.id,
+          metadata: {
+            employeeId: request.employeeId,
+            fieldChanged: request.fieldChanged,
+            newValue: request.newValue,
+            automated: false,
+          },
+        },
+        tx,
+      );
+    }
 
     return updated;
   });

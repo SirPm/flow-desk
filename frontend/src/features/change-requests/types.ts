@@ -1,5 +1,6 @@
 export type ChangeRequestStatus = 'PENDING' | 'SCHEDULED' | 'APPLIED' | 'REJECTED';
 export type ChangeRequestDecision = 'APPROVE' | 'REJECT';
+export type ChangeRequestField = 'POSITION' | 'DEPARTMENT' | 'SALARY' | 'EMPLOYMENT_TYPE';
 
 export interface ChangeRequestEmployee {
   id: string;
@@ -10,7 +11,7 @@ export interface ChangeRequestEmployee {
 export interface ChangeRequest {
   id: string;
   employeeId: string;
-  fieldChanged: string;
+  fieldChanged: ChangeRequestField;
   oldValue: string;
   newValue: string;
   effectiveDate: string;

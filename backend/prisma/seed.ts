@@ -1,7 +1,9 @@
 import {
   ApprovalActionType,
   ApprovalStatus,
+  ChangeRequestField,
   ChangeRequestStatus,
+  EmploymentType,
   PrismaClient,
   type Prisma,
   Role,
@@ -26,6 +28,29 @@ async function upsertOrganization(id: string, name: string, featureFlags: Record
   });
 }
 
+async function upsertDepartment(id: string, name: string, organizationId: string) {
+  return prisma.department.upsert({
+    where: { id },
+    update: {},
+    create: { id, name, organizationId },
+  });
+}
+
+async function upsertPosition(id: string, title: string, organizationId: string) {
+  return prisma.position.upsert({
+    where: { id },
+    update: {},
+    create: { id, title, organizationId },
+  });
+}
+
+interface EmployeeInfo {
+  departmentId?: string;
+  positionId?: string;
+  salary?: number;
+  employmentType?: EmploymentType;
+}
+
 async function upsertUser(
   id: string,
   name: string,
@@ -33,11 +58,28 @@ async function upsertUser(
   role: Role,
   organizationId: string,
   passwordHash: string,
+  employeeInfo: EmployeeInfo = {},
 ) {
   return prisma.user.upsert({
     where: { id },
-    update: {},
-    create: { id, name, email, role, organizationId, passwordHash },
+    update: {
+      departmentId: employeeInfo.departmentId ?? null,
+      positionId: employeeInfo.positionId ?? null,
+      salary: employeeInfo.salary ?? null,
+      employmentType: employeeInfo.employmentType ?? null,
+    },
+    create: {
+      id,
+      name,
+      email,
+      role,
+      organizationId,
+      passwordHash,
+      departmentId: employeeInfo.departmentId,
+      positionId: employeeInfo.positionId,
+      salary: employeeInfo.salary,
+      employmentType: employeeInfo.employmentType,
+    },
   });
 }
 
@@ -86,7 +128,7 @@ async function upsertApprovalAction(
 async function upsertChangeRequest(
   id: string,
   employeeId: string,
-  fieldChanged: string,
+  fieldChanged: ChangeRequestField,
   oldValue: string,
   newValue: string,
   effectiveDate: Date,
@@ -124,6 +166,22 @@ async function upsertAuditLog(
 async function seedAcme(passwordHash: string): Promise<void> {
   const acme = await upsertOrganization('org_acme_demo', 'Acme Corp', { changeRequests: true });
 
+  await upsertDepartment('dept_acme_engineering', 'Engineering', acme.id);
+  const sales = await upsertDepartment('dept_acme_sales', 'Sales', acme.id);
+  const marketing = await upsertDepartment('dept_acme_marketing', 'Marketing', acme.id);
+  const financeDept = await upsertDepartment('dept_acme_finance', 'Finance', acme.id);
+  const operations = await upsertDepartment('dept_acme_operations', 'Operations', acme.id);
+
+  const associate = await upsertPosition('pos_acme_associate', 'Associate', acme.id);
+  const seniorAssociate = await upsertPosition(
+    'pos_acme_senior_associate',
+    'Senior Associate',
+    acme.id,
+  );
+  await upsertPosition('pos_acme_software_engineer', 'Software Engineer', acme.id);
+  const financeAnalyst = await upsertPosition('pos_acme_finance_analyst', 'Finance Analyst', acme.id);
+  const operationsLead = await upsertPosition('pos_acme_operations_lead', 'Operations Lead', acme.id);
+
   const admin = await upsertUser(
     'user_acme_admin',
     'Ada Admin',
@@ -131,6 +189,12 @@ async function seedAcme(passwordHash: string): Promise<void> {
     Role.ADMIN,
     acme.id,
     passwordHash,
+    {
+      departmentId: operations.id,
+      positionId: operationsLead.id,
+      salary: 95000,
+      employmentType: EmploymentType.FULL_TIME,
+    },
   );
   const manager = await upsertUser(
     'user_acme_manager',
@@ -139,6 +203,12 @@ async function seedAcme(passwordHash: string): Promise<void> {
     Role.MANAGER,
     acme.id,
     passwordHash,
+    {
+      departmentId: sales.id,
+      positionId: seniorAssociate.id,
+      salary: 88000,
+      employmentType: EmploymentType.FULL_TIME,
+    },
   );
   const finance = await upsertUser(
     'user_acme_finance',
@@ -147,6 +217,12 @@ async function seedAcme(passwordHash: string): Promise<void> {
     Role.FINANCE,
     acme.id,
     passwordHash,
+    {
+      departmentId: financeDept.id,
+      positionId: financeAnalyst.id,
+      salary: 78000,
+      employmentType: EmploymentType.FULL_TIME,
+    },
   );
   const employee = await upsertUser(
     'user_acme_employee',
@@ -155,6 +231,12 @@ async function seedAcme(passwordHash: string): Promise<void> {
     Role.EMPLOYEE,
     acme.id,
     passwordHash,
+    {
+      departmentId: sales.id,
+      positionId: associate.id,
+      salary: 72000,
+      employmentType: EmploymentType.CONTRACT,
+    },
   );
 
   const expenseTemplate = await upsertWorkflowTemplate(
@@ -300,13 +382,15 @@ async function seedAcme(passwordHash: string): Promise<void> {
     },
   );
 
-  // Change requests across every status.
+  // Change requests across every status. Evan's current position/department/salary/employmentType
+  // (set above) reflect the outcome of these: pending/scheduled haven't taken effect yet, applied
+  // already did, rejected never did.
   await upsertChangeRequest(
     'cr_acme_pending',
     employee.id,
-    'Position',
-    'Associate',
-    'Senior Associate',
+    ChangeRequestField.POSITION,
+    associate.id,
+    seniorAssociate.id,
     addDays(30),
     ChangeRequestStatus.PENDING,
   );
@@ -316,15 +400,15 @@ async function seedAcme(passwordHash: string): Promise<void> {
     'CHANGE_REQUEST_CREATED',
     'ChangeRequest',
     'cr_acme_pending',
-    { employeeId: employee.id, fieldChanged: 'Position' },
+    { employeeId: employee.id, fieldChanged: ChangeRequestField.POSITION },
   );
 
   await upsertChangeRequest(
     'cr_acme_scheduled',
     employee.id,
-    'Department',
-    'Sales',
-    'Marketing',
+    ChangeRequestField.DEPARTMENT,
+    sales.id,
+    marketing.id,
     addDays(14),
     ChangeRequestStatus.SCHEDULED,
   );
@@ -334,7 +418,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
     'CHANGE_REQUEST_CREATED',
     'ChangeRequest',
     'cr_acme_scheduled',
-    { employeeId: employee.id, fieldChanged: 'Department' },
+    { employeeId: employee.id, fieldChanged: ChangeRequestField.DEPARTMENT },
   );
   await upsertAuditLog(
     'audit_cr_scheduled_2',
@@ -347,7 +431,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
   await upsertChangeRequest(
     'cr_acme_applied',
     employee.id,
-    'Salary',
+    ChangeRequestField.SALARY,
     '65000',
     '72000',
     addDays(-14),
@@ -359,7 +443,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
     'CHANGE_REQUEST_CREATED',
     'ChangeRequest',
     'cr_acme_applied',
-    { employeeId: employee.id, fieldChanged: 'Salary' },
+    { employeeId: employee.id, fieldChanged: ChangeRequestField.SALARY },
   );
   await upsertAuditLog(
     'audit_cr_applied_2',
@@ -368,13 +452,21 @@ async function seedAcme(passwordHash: string): Promise<void> {
     'ChangeRequest',
     'cr_acme_applied',
   );
+  await upsertAuditLog(
+    'audit_cr_applied_3',
+    employee.id,
+    'CHANGE_REQUEST_APPLIED',
+    'ChangeRequest',
+    'cr_acme_applied',
+    { employeeId: employee.id, fieldChanged: ChangeRequestField.SALARY, newValue: '72000', automated: true },
+  );
 
   await upsertChangeRequest(
     'cr_acme_rejected',
     employee.id,
-    'Employment Type',
-    'Contract',
-    'Full-Time',
+    ChangeRequestField.EMPLOYMENT_TYPE,
+    EmploymentType.CONTRACT,
+    EmploymentType.FULL_TIME,
     addDays(7),
     ChangeRequestStatus.REJECTED,
   );
@@ -384,7 +476,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
     'CHANGE_REQUEST_CREATED',
     'ChangeRequest',
     'cr_acme_rejected',
-    { employeeId: employee.id, fieldChanged: 'Employment Type' },
+    { employeeId: employee.id, fieldChanged: ChangeRequestField.EMPLOYMENT_TYPE },
   );
   await upsertAuditLog(
     'audit_cr_rejected_2',
@@ -413,6 +505,12 @@ async function seedGlobex(passwordHash: string): Promise<void> {
     changeRequests: false,
   });
 
+  const operations = await upsertDepartment('dept_globex_operations', 'Operations', globex.id);
+  const sales = await upsertDepartment('dept_globex_sales', 'Sales', globex.id);
+
+  const teamLead = await upsertPosition('pos_globex_team_lead', 'Team Lead', globex.id);
+  const associate = await upsertPosition('pos_globex_associate', 'Associate', globex.id);
+
   const admin = await upsertUser(
     'user_globex_admin',
     'Gary Grant',
@@ -420,6 +518,12 @@ async function seedGlobex(passwordHash: string): Promise<void> {
     Role.ADMIN,
     globex.id,
     passwordHash,
+    {
+      departmentId: operations.id,
+      positionId: teamLead.id,
+      salary: 90000,
+      employmentType: EmploymentType.FULL_TIME,
+    },
   );
   await upsertUser(
     'user_globex_manager',
@@ -428,6 +532,12 @@ async function seedGlobex(passwordHash: string): Promise<void> {
     Role.MANAGER,
     globex.id,
     passwordHash,
+    {
+      departmentId: sales.id,
+      positionId: teamLead.id,
+      salary: 82000,
+      employmentType: EmploymentType.FULL_TIME,
+    },
   );
   const employee = await upsertUser(
     'user_globex_employee',
@@ -436,6 +546,12 @@ async function seedGlobex(passwordHash: string): Promise<void> {
     Role.EMPLOYEE,
     globex.id,
     passwordHash,
+    {
+      departmentId: sales.id,
+      positionId: associate.id,
+      salary: 58000,
+      employmentType: EmploymentType.PART_TIME,
+    },
   );
 
   const purchaseTemplate = await upsertWorkflowTemplate(

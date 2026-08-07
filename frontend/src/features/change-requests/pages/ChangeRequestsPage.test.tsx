@@ -6,6 +6,8 @@ import { authReducer } from '../../auth/authSlice';
 import { ChangeRequestsPage } from './ChangeRequestsPage';
 import * as changeRequestsApi from '../api/changeRequestsApi';
 import * as organizationApi from '../../organization/api/organizationApi';
+import * as departmentsApi from '../../organization/api/departmentsApi';
+import * as positionsApi from '../../organization/api/positionsApi';
 import * as usersApi from '../../users/api/usersApi';
 import type { AuthUser, Role } from '../../auth/types';
 import type { ChangeRequest } from '../types';
@@ -13,6 +15,8 @@ import type { Organization } from '../../organization/types';
 
 jest.mock('../api/changeRequestsApi');
 jest.mock('../../organization/api/organizationApi');
+jest.mock('../../organization/api/departmentsApi');
+jest.mock('../../organization/api/positionsApi');
 jest.mock('../../users/api/usersApi');
 
 const organization: Organization = {
@@ -26,9 +30,9 @@ const organization: Organization = {
 const pendingRequest: ChangeRequest = {
   id: 'cr_1',
   employeeId: 'user_employee',
-  fieldChanged: 'Position',
-  oldValue: 'Associate',
-  newValue: 'Senior Associate',
+  fieldChanged: 'POSITION',
+  oldValue: 'pos_associate',
+  newValue: 'pos_senior_associate',
   effectiveDate: new Date().toISOString(),
   status: 'PENDING',
   createdAt: new Date().toISOString(),
@@ -62,6 +66,8 @@ function renderPage(role: Role) {
 beforeEach(() => {
   jest.spyOn(organizationApi, 'getOrganization').mockResolvedValue(organization);
   jest.spyOn(usersApi, 'listOrganizationUsers').mockResolvedValue([]);
+  jest.spyOn(departmentsApi, 'listDepartments').mockResolvedValue([]);
+  jest.spyOn(positionsApi, 'listPositions').mockResolvedValue([]);
   jest.spyOn(changeRequestsApi, 'listChangeRequests').mockResolvedValue([pendingRequest]);
 });
 

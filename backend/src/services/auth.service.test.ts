@@ -12,6 +12,10 @@ const baseUser = {
   passwordHash: '',
   role: Role.ADMIN,
   organizationId: 'org_1',
+  departmentId: null,
+  positionId: null,
+  salary: null,
+  employmentType: null,
   createdAt: now,
   updatedAt: now,
 };

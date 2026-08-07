@@ -40,6 +40,19 @@ enum ChangeRequestStatus {
   REJECTED
 }
 
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+}
+
+enum ChangeRequestField {
+  POSITION
+  DEPARTMENT
+  SALARY
+  EMPLOYMENT_TYPE
+}
+
 model Organization {
   id           String   @id @default(cuid())
   name         String
@@ -49,21 +62,29 @@ model Organization {
 
   users             User[]
   workflowTemplates WorkflowTemplate[]
+  departments       Department[]
+  positions         Position[]
 
   @@map("organizations")
 }
 
 model User {
-  id             String   @id @default(cuid())
+  id             String          @id @default(cuid())
   name           String
-  email          String   @unique
+  email          String          @unique
   passwordHash   String
   role           Role
   organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  departmentId   String?
+  positionId     String?
+  salary         Int?
+  employmentType EmploymentType?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   organization       Organization       @relation(fields: [organizationId], references: [id])
+  department         Department?        @relation(fields: [departmentId], references: [id])
+  position           Position?          @relation(fields: [positionId], references: [id])
   createdTemplates   WorkflowTemplate[] @relation("WorkflowTemplateCreatedBy")
   assignedTasks      TaskAssignment[]   @relation("TaskAssignmentAssignedTo")
   requestedApprovals ApprovalRequest[]  @relation("ApprovalRequestRequestedBy")
@@ -72,7 +93,37 @@ model User {
   auditLogs          AuditLog[]         @relation("AuditLogActor")
 
   @@index([organizationId])
+  @@index([departmentId])
+  @@index([positionId])
   @@map("users")
+}
+
+model Department {
+  id             String   @id @default(cuid())
+  name           String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  users        User[]
+
+  @@unique([organizationId, name])
+  @@map("departments")
+}
+
+model Position {
+  id             String   @id @default(cuid())
+  title          String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  users        User[]
+
+  @@unique([organizationId, title])
+  @@map("positions")
 }
 
 model WorkflowTemplate {
@@ -149,7 +200,7 @@ model ApprovalAction {
 model ChangeRequest {
   id            String              @id @default(cuid())
   employeeId    String
-  fieldChanged  String
+  fieldChanged  ChangeRequestField
   oldValue      String
   newValue      String
   effectiveDate DateTime

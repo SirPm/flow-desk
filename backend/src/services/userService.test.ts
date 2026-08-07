@@ -11,13 +11,13 @@ describe('listOrganizationUsers', () => {
         id: 'user_1',
         name: 'Ada Admin',
         email: 'admin@acme.test',
-        passwordHash: 'hash',
         role: Role.ADMIN,
-        organizationId: 'org_1',
-        createdAt: now,
-        updatedAt: now,
+        department: null,
+        position: null,
+        employmentType: null,
+        salary: null,
       },
-    ]);
+    ] as never);
 
     const result = await listOrganizationUsers('org_1');
 

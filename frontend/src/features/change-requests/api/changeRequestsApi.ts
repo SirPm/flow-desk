@@ -1,5 +1,5 @@
 import { apiClient } from '../../../lib/apiClient';
-import type { ChangeRequest, ChangeRequestDecision, ChangeRequestStatus } from '../types';
+import type { ChangeRequest, ChangeRequestDecision, ChangeRequestField, ChangeRequestStatus } from '../types';
 
 export interface ListChangeRequestsParams {
   employeeId?: string;
@@ -17,7 +17,7 @@ export async function listChangeRequests(
 
 export interface CreateChangeRequestPayload {
   employeeId: string;
-  fieldChanged: string;
+  fieldChanged: ChangeRequestField;
   oldValue: string;
   newValue: string;
   effectiveDate: string;

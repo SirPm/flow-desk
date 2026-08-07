@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { ChangeRequestStatus, Role } from '@prisma/client';
+import { ChangeRequestField, ChangeRequestStatus, Role } from '@prisma/client';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { parseOrThrow } from '../lib/validate';
 import {
@@ -14,9 +14,9 @@ export const changeRequestsRouter = Router();
 
 const createSchema = z.object({
   employeeId: z.string().min(1, 'employeeId is required'),
-  fieldChanged: z.string().min(1, 'fieldChanged is required'),
+  fieldChanged: z.nativeEnum(ChangeRequestField),
   oldValue: z.string(),
-  newValue: z.string(),
+  newValue: z.string().min(1, 'newValue is required'),
   effectiveDate: z.coerce.date(),
 });
 

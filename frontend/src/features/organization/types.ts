@@ -5,3 +5,19 @@ export interface Organization {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Department {
+  id: string;
+  name: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Position {
+  id: string;
+  title: string;
+  organizationId: string;
+  createdAt: string;
+  updatedAt: string;
+}

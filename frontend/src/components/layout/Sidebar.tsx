@@ -9,11 +9,14 @@ export function Sidebar() {
 
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', show: true },
+    { to: '/profile', label: 'My Profile', show: true },
+    { to: '/employees', label: 'Employees', show: true },
     { to: '/workflows', label: 'Workflows', show: true },
     { to: '/approvals', label: 'Approvals', show: true },
     { to: '/change-requests', label: 'Change Requests', show: changeRequestsEnabled },
     { to: '/audit-log', label: 'Audit Log', show: role === 'ADMIN' },
     { to: '/feature-flags', label: 'Feature Flags', show: role === 'ADMIN' },
+    { to: '/org-structure', label: 'Departments & Positions', show: role === 'ADMIN' },
   ].filter((item) => item.show);
 
   return (
