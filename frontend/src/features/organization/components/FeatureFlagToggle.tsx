@@ -12,8 +12,8 @@ export function FeatureFlagToggle({
   onChange: (enabled: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4">
-      <div>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="min-w-0">
         <p className="text-sm font-semibold text-slate-900">{label}</p>
         <p className="mt-1 text-xs text-slate-500">{description}</p>
       </div>

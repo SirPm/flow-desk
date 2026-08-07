@@ -13,8 +13,8 @@ export function ChangeRequestCard({
   isReviewing: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4">
-      <div>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="min-w-0">
         <p className="text-sm font-semibold text-slate-900">
           {request.employee?.name ?? request.employeeId} · {request.fieldChanged}
         </p>
@@ -25,7 +25,7 @@ export function ChangeRequestCard({
           Effective {new Date(request.effectiveDate).toLocaleDateString()}
         </p>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <ChangeRequestStatusBadge status={request.status} />
         {canReview && request.status === 'PENDING' && (
           <div className="flex gap-2">

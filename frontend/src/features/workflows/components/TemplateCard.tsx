@@ -10,8 +10,8 @@ export function TemplateCard({
   isSubmitting: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4">
-      <div>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <div className="min-w-0">
         <h3 className="text-sm font-semibold text-slate-900">{template.name}</h3>
         <p className="mt-1 text-xs text-slate-500">{template.steps.join(' → ')}</p>
       </div>

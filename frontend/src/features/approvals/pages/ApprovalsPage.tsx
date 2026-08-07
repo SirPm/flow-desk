@@ -48,9 +48,9 @@ export function ApprovalsPage() {
               <li key={request.id}>
                 <Link
                   to={`/approvals/${request.id}`}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 hover:border-indigo-300"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 hover:border-indigo-300"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-900">
                       Step{' '}
                       {request.status !== 'APPROVED'
