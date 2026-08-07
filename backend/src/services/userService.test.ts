@@ -2,7 +2,7 @@ import { Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { listOrganizationUsers } from './userService';
 
-const now = new Date();
+// const now = new Date();
 
 describe('listOrganizationUsers', () => {
   it('scopes the query to the organization', async () => {

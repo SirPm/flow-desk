@@ -1,4 +1,9 @@
-import { ChangeRequestField, ChangeRequestStatus, EmploymentType, type ChangeRequest } from '@prisma/client';
+import {
+  ChangeRequestField,
+  ChangeRequestStatus,
+  EmploymentType,
+  type ChangeRequest,
+} from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { logAction } from './auditLogger';
@@ -178,7 +183,9 @@ export async function reviewChangeRequest(input: ReviewChangeRequestInput): Prom
   }
 
   const isEffectiveImmediately = request.effectiveDate <= new Date();
-  const status = isEffectiveImmediately ? ChangeRequestStatus.APPLIED : ChangeRequestStatus.SCHEDULED;
+  const status = isEffectiveImmediately
+    ? ChangeRequestStatus.APPLIED
+    : ChangeRequestStatus.SCHEDULED;
 
   return prisma.$transaction(async (tx) => {
     if (isEffectiveImmediately) {

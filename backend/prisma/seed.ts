@@ -179,8 +179,16 @@ async function seedAcme(passwordHash: string): Promise<void> {
     acme.id,
   );
   await upsertPosition('pos_acme_software_engineer', 'Software Engineer', acme.id);
-  const financeAnalyst = await upsertPosition('pos_acme_finance_analyst', 'Finance Analyst', acme.id);
-  const operationsLead = await upsertPosition('pos_acme_operations_lead', 'Operations Lead', acme.id);
+  const financeAnalyst = await upsertPosition(
+    'pos_acme_finance_analyst',
+    'Finance Analyst',
+    acme.id,
+  );
+  const operationsLead = await upsertPosition(
+    'pos_acme_operations_lead',
+    'Operations Lead',
+    acme.id,
+  );
 
   const admin = await upsertUser(
     'user_acme_admin',
@@ -458,7 +466,12 @@ async function seedAcme(passwordHash: string): Promise<void> {
     'CHANGE_REQUEST_APPLIED',
     'ChangeRequest',
     'cr_acme_applied',
-    { employeeId: employee.id, fieldChanged: ChangeRequestField.SALARY, newValue: '72000', automated: true },
+    {
+      employeeId: employee.id,
+      fieldChanged: ChangeRequestField.SALARY,
+      newValue: '72000',
+      automated: true,
+    },
   );
 
   await upsertChangeRequest(

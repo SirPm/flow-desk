@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import { Role } from '@prisma/client';
 import { authenticate } from '../middleware/auth.middleware';
-import { getUserProfile, listOrganizationUsers, type EmployeeSummary } from '../services/userService';
+import {
+  getUserProfile,
+  listOrganizationUsers,
+  type EmployeeSummary,
+} from '../services/userService';
 
 export const usersRouter = Router();
 

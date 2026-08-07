@@ -250,7 +250,11 @@ export function EditEmployeeInfoForm() {
       <button
         type="submit"
         disabled={
-          createChangeRequest.isPending || !employeeId || !fieldChanged || !newValue || !effectiveDate
+          createChangeRequest.isPending ||
+          !employeeId ||
+          !fieldChanged ||
+          !newValue ||
+          !effectiveDate
         }
         className="self-start rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
       >
