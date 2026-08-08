@@ -535,7 +535,9 @@ describe('reviewChangeRequest', () => {
     expect(changeRequestUpdateSpy).not.toHaveBeenCalled();
     expect(userUpdateSpy).not.toHaveBeenCalled();
     expect(prisma.auditLog.create).not.toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ action: 'CHANGE_REQUEST_APPROVED' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'CHANGE_REQUEST_APPROVED' }),
+      }),
     );
     expect(result.status).toBe(ChangeRequestStatus.PENDING);
   });

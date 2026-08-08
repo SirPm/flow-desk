@@ -70,7 +70,10 @@ export function CreateTemplateForm({ onCreated }: { onCreated?: () => void }) {
           <span className="text-sm font-medium text-slate-700">
             Change-request fields <span className="font-normal text-slate-400">(optional)</span>
           </span>
-          <ChangeRequestFieldsPicker fields={changeRequestFields} onChange={setChangeRequestFields} />
+          <ChangeRequestFieldsPicker
+            fields={changeRequestFields}
+            onChange={setChangeRequestFields}
+          />
         </div>
       )}
       {createTemplate.isError && (

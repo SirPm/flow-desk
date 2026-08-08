@@ -11,9 +11,7 @@ export function ChangeRequestFieldsPicker({
   onChange: (fields: ChangeRequestField[]) => void;
 }) {
   function toggle(field: ChangeRequestField) {
-    onChange(
-      fields.includes(field) ? fields.filter((f) => f !== field) : [...fields, field],
-    );
+    onChange(fields.includes(field) ? fields.filter((f) => f !== field) : [...fields, field]);
   }
 
   return (

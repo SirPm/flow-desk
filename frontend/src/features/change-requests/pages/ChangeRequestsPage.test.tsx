@@ -114,7 +114,7 @@ describe('ChangeRequestsPage role gating', () => {
     expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument();
   });
 
-  it('shows review buttons for a manager when they are the current step\'s required role', async () => {
+  it("shows review buttons for a manager when they are the current step's required role", async () => {
     jest.spyOn(changeRequestsApi, 'listChangeRequests').mockResolvedValue([
       {
         ...pendingRequest,
@@ -166,9 +166,9 @@ describe('ChangeRequestsPage role gating', () => {
   });
 
   it('only offers fields the default template covers in the create form', async () => {
-    jest.spyOn(workflowsApi, 'listWorkflowTemplates').mockResolvedValue([
-      { ...workflowTemplate, changeRequestFields: ['POSITION'] },
-    ]);
+    jest
+      .spyOn(workflowsApi, 'listWorkflowTemplates')
+      .mockResolvedValue([{ ...workflowTemplate, changeRequestFields: ['POSITION'] }]);
 
     renderPage('ADMIN');
 

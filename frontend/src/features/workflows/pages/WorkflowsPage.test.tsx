@@ -92,9 +92,16 @@ describe('WorkflowsPage default change-request template', () => {
   });
 
   it('never shows the set-default affordance or change-request scope for a template not enabled for change requests', async () => {
-    jest.spyOn(workflowsApi, 'listWorkflowTemplates').mockResolvedValue([
-      { ...template, id: 'wft_expense', name: 'Expense Approval', isChangeRequestTemplate: false },
-    ]);
+    jest
+      .spyOn(workflowsApi, 'listWorkflowTemplates')
+      .mockResolvedValue([
+        {
+          ...template,
+          id: 'wft_expense',
+          name: 'Expense Approval',
+          isChangeRequestTemplate: false,
+        },
+      ]);
 
     renderPage('ADMIN');
 
@@ -111,10 +118,12 @@ describe('WorkflowsPage default change-request template', () => {
   });
 
   it('shows "all fields" for an unrestricted template and the specific fields for a scoped one', async () => {
-    jest.spyOn(workflowsApi, 'listWorkflowTemplates').mockResolvedValue([
-      template,
-      { ...template, id: 'wft_2', name: 'Position Only', changeRequestFields: ['POSITION'] },
-    ]);
+    jest
+      .spyOn(workflowsApi, 'listWorkflowTemplates')
+      .mockResolvedValue([
+        template,
+        { ...template, id: 'wft_2', name: 'Position Only', changeRequestFields: ['POSITION'] },
+      ]);
 
     renderPage('ADMIN');
 
@@ -131,9 +140,7 @@ describe('WorkflowsPage default change-request template', () => {
 
     await userEvent.type(await screen.findByLabelText('Name'), 'Salary Change');
     await userEvent.click(screen.getByRole('button', { name: 'Add step' }));
-    await userEvent.click(
-      screen.getByLabelText('Usable as a change-request review template'),
-    );
+    await userEvent.click(screen.getByLabelText('Usable as a change-request review template'));
     await userEvent.click(screen.getByLabelText('Salary'));
     await userEvent.click(screen.getByRole('button', { name: 'Create template' }));
 

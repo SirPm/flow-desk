@@ -7,7 +7,11 @@ import { StepTimeline } from '../../approvals/components/StepTimeline';
 import { useChangeRequest } from '../hooks/useChangeRequest';
 import { ChangeRequestActionButtons } from '../components/ChangeRequestActionButtons';
 import { ChangeRequestStatusBadge } from '../components/ChangeRequestStatusBadge';
-import { CHANGE_REQUEST_FIELD_LABELS, canReviewChangeRequest, resolveChangeRequestValue } from '../utils';
+import {
+  CHANGE_REQUEST_FIELD_LABELS,
+  canReviewChangeRequest,
+  resolveChangeRequestValue,
+} from '../utils';
 
 export function ChangeRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,8 +21,7 @@ export function ChangeRequestDetailPage() {
   const { data: positions } = usePositions();
 
   if (isLoading) return <p className="text-sm text-slate-500">Loading...</p>;
-  if (isError || !request)
-    return <p className="text-sm text-red-600">Change request not found.</p>;
+  if (isError || !request) return <p className="text-sm text-red-600">Change request not found.</p>;
 
   const canAct = canReviewChangeRequest(request, role);
   const resolveValue = (value: string) =>

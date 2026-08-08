@@ -183,9 +183,7 @@ export function listChangeRequests(
 export async function getChangeRequestById(
   id: string,
   organizationId: string,
-): Promise<
-  ChangeRequestWithEmployee & { approvalRequest: { actions: ApprovalAction[] } }
-> {
+): Promise<ChangeRequestWithEmployee & { approvalRequest: { actions: ApprovalAction[] } }> {
   const request = await prisma.changeRequest.findUnique({
     where: { id },
     include: {
