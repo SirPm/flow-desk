@@ -45,3 +45,44 @@ export async function setFeatureFlag(input: SetFeatureFlagInput): Promise<Organi
     return updated;
   });
 }
+
+export interface SetChangeRequestTemplateInput {
+  organizationId: string;
+  actorId: string;
+  workflowTemplateId: string | null;
+}
+
+export async function setChangeRequestTemplate(
+  input: SetChangeRequestTemplateInput,
+): Promise<Organization> {
+  await getOrganization(input.organizationId);
+
+  if (input.workflowTemplateId) {
+    const template = await prisma.workflowTemplate.findUnique({
+      where: { id: input.workflowTemplateId },
+    });
+    if (!template || template.organizationId !== input.organizationId) {
+      throw new NotFoundError('Workflow template not found');
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.organization.update({
+      where: { id: input.organizationId },
+      data: { changeRequestTemplateId: input.workflowTemplateId },
+    });
+
+    await logAction(
+      {
+        actorId: input.actorId,
+        action: 'CHANGE_REQUEST_TEMPLATE_SET',
+        entityType: 'Organization',
+        entityId: input.organizationId,
+        metadata: { workflowTemplateId: input.workflowTemplateId },
+      },
+      tx,
+    );
+
+    return updated;
+  });
+}

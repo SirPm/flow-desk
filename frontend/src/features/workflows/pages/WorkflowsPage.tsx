@@ -3,13 +3,17 @@ import { useAppSelector } from '../../../app/hooks';
 import { EmptyState } from '../../../components/EmptyState';
 import { useWorkflowTemplates } from '../hooks/useWorkflowTemplates';
 import { useCreateApprovalRequest } from '../../approvals/hooks/useCreateApprovalRequest';
+import { useOrganization } from '../../organization/hooks/useOrganization';
+import { useSetChangeRequestTemplate } from '../../organization/hooks/useSetChangeRequestTemplate';
 import { CreateTemplateForm } from '../components/CreateTemplateForm';
 import { TemplateCard } from '../components/TemplateCard';
 
 export function WorkflowsPage() {
   const role = useAppSelector((state) => state.auth.user?.role);
   const { data: templates, isLoading, isError } = useWorkflowTemplates();
+  const { data: organization } = useOrganization();
   const createRequest = useCreateApprovalRequest();
+  const setChangeRequestTemplate = useSetChangeRequestTemplate();
   const navigate = useNavigate();
 
   function handleSubmitRequest(templateId: string) {
@@ -42,6 +46,13 @@ export function WorkflowsPage() {
               template={template}
               onSubmitRequest={handleSubmitRequest}
               isSubmitting={createRequest.isPending}
+              isDefaultForChangeRequests={template.id === organization?.changeRequestTemplateId}
+              onSetDefault={
+                role === 'ADMIN'
+                  ? (templateId) => setChangeRequestTemplate.mutate(templateId)
+                  : undefined
+              }
+              isSettingDefault={setChangeRequestTemplate.isPending}
             />
           ))}
         </div>

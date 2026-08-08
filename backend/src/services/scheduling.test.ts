@@ -10,6 +10,7 @@ const dueRequest = {
   newValue: 'pos_senior_associate',
   effectiveDate: new Date('2026-01-01'),
   status: ChangeRequestStatus.SCHEDULED,
+  approvalRequestId: 'req_due',
   createdAt: new Date('2025-12-01'),
   updatedAt: new Date('2025-12-01'),
 };

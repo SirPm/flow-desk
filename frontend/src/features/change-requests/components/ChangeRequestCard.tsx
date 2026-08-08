@@ -1,15 +1,9 @@
+import { Link } from 'react-router-dom';
 import { useDepartments } from '../../organization/hooks/useDepartments';
 import { usePositions } from '../../organization/hooks/usePositions';
-import { EMPLOYMENT_TYPE_LABELS } from '../../users/constants';
-import type { ChangeRequest, ChangeRequestDecision, ChangeRequestField } from '../types';
+import type { ChangeRequest, ChangeRequestDecision } from '../types';
+import { CHANGE_REQUEST_FIELD_LABELS, resolveChangeRequestValue } from '../utils';
 import { ChangeRequestStatusBadge } from './ChangeRequestStatusBadge';
-
-const FIELD_LABELS: Record<ChangeRequestField, string> = {
-  POSITION: 'Position',
-  DEPARTMENT: 'Department',
-  SALARY: 'Salary',
-  EMPLOYMENT_TYPE: 'Employment Type',
-};
 
 export function ChangeRequestCard({
   request,
@@ -26,25 +20,19 @@ export function ChangeRequestCard({
   const { data: positions } = usePositions();
 
   function resolveValue(value: string): string {
-    if (!value) return 'Not set';
-    switch (request.fieldChanged) {
-      case 'POSITION':
-        return positions?.find((position) => position.id === value)?.title ?? value;
-      case 'DEPARTMENT':
-        return departments?.find((department) => department.id === value)?.name ?? value;
-      case 'EMPLOYMENT_TYPE':
-        return EMPLOYMENT_TYPE_LABELS[value as keyof typeof EMPLOYMENT_TYPE_LABELS] ?? value;
-      default:
-        return value;
-    }
+    return resolveChangeRequestValue(request.fieldChanged, value, { departments, positions });
   }
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-slate-900">
-          {request.employee?.name ?? request.employeeId} · {FIELD_LABELS[request.fieldChanged]}
-        </p>
+        <Link
+          to={`/change-requests/${request.id}`}
+          className="text-sm font-semibold text-slate-900 hover:text-indigo-600 hover:underline"
+        >
+          {request.employee?.name ?? request.employeeId} ·{' '}
+          {CHANGE_REQUEST_FIELD_LABELS[request.fieldChanged]}
+        </Link>
         <p className="mt-1 text-xs text-slate-500">
           {resolveValue(request.oldValue)} &rarr; {resolveValue(request.newValue)}
         </p>

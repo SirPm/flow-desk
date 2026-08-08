@@ -4,6 +4,7 @@ import { useApprovalRequest } from '../hooks/useApprovalRequest';
 import { ApprovalActionButtons } from '../components/ApprovalActionButtons';
 import { ApprovalActionHistory } from '../components/ApprovalActionHistory';
 import { StatusBadge } from '../components/StatusBadge';
+import { StepTimeline } from '../components/StepTimeline';
 
 export function ApprovalRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,28 +30,11 @@ export function ApprovalRequestDetailPage() {
         <StatusBadge status={request.status} />
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <ol className="flex flex-wrap gap-2 text-sm">
-          {request.workflowTemplate.steps.map((step, index) => {
-            const isDone = index < request.currentStep || request.status === 'APPROVED';
-            const isCurrent = index === request.currentStep && request.status === 'PENDING';
-            return (
-              <li
-                key={`${step}-${index}`}
-                className={`rounded-full px-3 py-1 font-medium ${
-                  isCurrent
-                    ? 'bg-indigo-600 text-white'
-                    : isDone
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-slate-100 text-slate-500'
-                }`}
-              >
-                {index + 1}. {step}
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+      <StepTimeline
+        steps={request.workflowTemplate.steps}
+        currentStep={request.currentStep}
+        status={request.status}
+      />
 
       {canAct && <ApprovalActionButtons requestId={request.id} />}
 

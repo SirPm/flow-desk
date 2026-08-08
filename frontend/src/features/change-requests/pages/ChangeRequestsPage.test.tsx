@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { Provider as ReduxProvider } from 'react-redux';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { configureStore } from '@reduxjs/toolkit';
@@ -9,20 +10,34 @@ import * as organizationApi from '../../organization/api/organizationApi';
 import * as departmentsApi from '../../organization/api/departmentsApi';
 import * as positionsApi from '../../organization/api/positionsApi';
 import * as usersApi from '../../users/api/usersApi';
+import * as workflowsApi from '../../workflows/api/workflowsApi';
 import type { AuthUser, Role } from '../../auth/types';
 import type { ChangeRequest } from '../types';
 import type { Organization } from '../../organization/types';
+import type { WorkflowTemplate } from '../../workflows/types';
 
 jest.mock('../api/changeRequestsApi');
 jest.mock('../../organization/api/organizationApi');
 jest.mock('../../organization/api/departmentsApi');
 jest.mock('../../organization/api/positionsApi');
 jest.mock('../../users/api/usersApi');
+jest.mock('../../workflows/api/workflowsApi');
 
 const organization: Organization = {
   id: 'org_1',
   name: 'Acme Corp',
   featureFlags: { changeRequests: true },
+  changeRequestTemplateId: 'wft_change_request',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+const workflowTemplate: WorkflowTemplate = {
+  id: 'wft_change_request',
+  name: 'Employee Change Request',
+  steps: ['MANAGER', 'ADMIN'],
+  createdBy: 'user_admin',
+  organizationId: 'org_1',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -38,6 +53,12 @@ const pendingRequest: ChangeRequest = {
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   employee: { id: 'user_employee', name: 'Evan Employee', email: 'employee@acme.test' },
+  approvalRequest: {
+    id: 'req_1',
+    currentStep: 0,
+    status: 'PENDING',
+    workflowTemplate: { steps: ['ADMIN'] },
+  },
 };
 
 function renderPage(role: Role) {
@@ -57,7 +78,9 @@ function renderPage(role: Role) {
   return render(
     <ReduxProvider store={store}>
       <QueryClientProvider client={queryClient}>
-        <ChangeRequestsPage />
+        <MemoryRouter>
+          <ChangeRequestsPage />
+        </MemoryRouter>
       </QueryClientProvider>
     </ReduxProvider>,
   );
@@ -69,6 +92,7 @@ beforeEach(() => {
   jest.spyOn(departmentsApi, 'listDepartments').mockResolvedValue([]);
   jest.spyOn(positionsApi, 'listPositions').mockResolvedValue([]);
   jest.spyOn(changeRequestsApi, 'listChangeRequests').mockResolvedValue([pendingRequest]);
+  jest.spyOn(workflowsApi, 'listWorkflowTemplates').mockResolvedValue([workflowTemplate]);
 });
 
 describe('ChangeRequestsPage role gating', () => {
@@ -80,12 +104,29 @@ describe('ChangeRequestsPage role gating', () => {
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
   });
 
-  it('shows the create form but hides review buttons for a manager', async () => {
+  it('shows the create form but hides review buttons for a manager who is not the current step', async () => {
     renderPage('MANAGER');
 
     expect(await screen.findByText('Edit employee info')).toBeInTheDocument();
     await screen.findByText('Evan Employee', { exact: false });
     expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument();
+  });
+
+  it('shows review buttons for a manager when they are the current step\'s required role', async () => {
+    jest.spyOn(changeRequestsApi, 'listChangeRequests').mockResolvedValue([
+      {
+        ...pendingRequest,
+        approvalRequest: {
+          ...pendingRequest.approvalRequest,
+          workflowTemplate: { steps: ['MANAGER'] },
+        },
+      },
+    ]);
+
+    renderPage('MANAGER');
+
+    expect(await screen.findByRole('button', { name: 'Approve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
   });
 
   it('hides the create form and review buttons for an employee', async () => {
@@ -94,6 +135,32 @@ describe('ChangeRequestsPage role gating', () => {
     await screen.findByText('Evan Employee', { exact: false });
     expect(screen.queryByText('Edit employee info')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /approve/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the current default template and a select for an admin', async () => {
+    renderPage('ADMIN');
+
+    expect(await screen.findByText(/Employee Change Request/)).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Review workflow template' })).toBeInTheDocument();
+  });
+
+  it('shows the current default template as read-only for a manager', async () => {
+    renderPage('MANAGER');
+
+    expect(await screen.findByText(/Employee Change Request/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Review workflow template' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('warns when no default template is configured', async () => {
+    jest
+      .spyOn(organizationApi, 'getOrganization')
+      .mockResolvedValue({ ...organization, changeRequestTemplateId: null });
+
+    renderPage('ADMIN');
+
+    expect(await screen.findByText(/no default template configured/i)).toBeInTheDocument();
   });
 
   it('shows a disabled-feature message when the org has turned change requests off, even for an admin', async () => {

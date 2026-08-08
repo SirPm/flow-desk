@@ -54,17 +54,21 @@ enum ChangeRequestField {
 }
 
 model Organization {
-  id           String   @id @default(cuid())
-  name         String
-  featureFlags Json     @default("{}")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  name                    String
+  featureFlags            Json     @default("{}")
+  changeRequestTemplateId String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   users             User[]
   workflowTemplates WorkflowTemplate[]
   departments       Department[]
   positions         Position[]
 
+  defaultChangeRequestTemplate WorkflowTemplate? @relation("OrgDefaultChangeRequestTemplate", fields: [changeRequestTemplateId], references: [id])
+
+  @@index([changeRequestTemplateId])
   @@map("organizations")
 }
 
@@ -140,6 +144,8 @@ model WorkflowTemplate {
   taskAssignments  TaskAssignment[]
   approvalRequests ApprovalRequest[]
 
+  defaultForOrganizations Organization[] @relation("OrgDefaultChangeRequestTemplate")
+
   @@index([createdBy])
   @@index([organizationId])
   @@map("workflow_templates")
@@ -174,6 +180,7 @@ model ApprovalRequest {
   workflowTemplate WorkflowTemplate @relation(fields: [workflowTemplateId], references: [id])
   requester        User             @relation("ApprovalRequestRequestedBy", fields: [requestedBy], references: [id])
   actions          ApprovalAction[]
+  changeRequest    ChangeRequest?
 
   @@index([workflowTemplateId])
   @@index([requestedBy])
@@ -198,17 +205,19 @@ model ApprovalAction {
 }
 
 model ChangeRequest {
-  id            String              @id @default(cuid())
-  employeeId    String
-  fieldChanged  ChangeRequestField
-  oldValue      String
-  newValue      String
-  effectiveDate DateTime
-  status        ChangeRequestStatus @default(PENDING)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id                String              @id @default(cuid())
+  employeeId        String
+  fieldChanged      ChangeRequestField
+  oldValue          String
+  newValue          String
+  effectiveDate     DateTime
+  status            ChangeRequestStatus @default(PENDING)
+  approvalRequestId String              @unique
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
-  employee User @relation("ChangeRequestEmployee", fields: [employeeId], references: [id])
+  employee        User            @relation("ChangeRequestEmployee", fields: [employeeId], references: [id])
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id])
 
   @@index([employeeId])
   @@index([status])

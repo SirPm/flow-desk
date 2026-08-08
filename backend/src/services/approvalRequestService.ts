@@ -4,11 +4,14 @@ import {
   Role,
   type ApprovalAction,
   type ApprovalRequest,
+  type Prisma,
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError } from '../lib/errors';
 import { advanceApprovalRequest } from './approvalEngine';
 import { logAction } from './auditLogger';
+
+type PrismaLike = Pick<typeof prisma, 'approvalRequest' | 'workflowTemplate'>;
 
 export interface CreateApprovalRequestInput {
   workflowTemplateId: string;
@@ -18,15 +21,16 @@ export interface CreateApprovalRequestInput {
 
 export async function createApprovalRequest(
   input: CreateApprovalRequestInput,
+  client: PrismaLike = prisma,
 ): Promise<ApprovalRequest> {
-  const template = await prisma.workflowTemplate.findUnique({
+  const template = await client.workflowTemplate.findUnique({
     where: { id: input.workflowTemplateId },
   });
   if (!template || template.organizationId !== input.organizationId) {
     throw new NotFoundError('Workflow template not found');
   }
 
-  return prisma.approvalRequest.create({
+  return client.approvalRequest.create({
     data: {
       workflowTemplateId: input.workflowTemplateId,
       requestedBy: input.requestedBy,
@@ -88,6 +92,11 @@ export interface ActOnApprovalRequestInput {
   actorRole: Role;
   decision: ApprovalActionType;
   note?: string;
+  onResolved?: (ctx: {
+    tx: Prisma.TransactionClient;
+    approvalRequest: ApprovalRequest & { actions: ApprovalAction[] };
+    resolution: typeof ApprovalStatus.APPROVED | typeof ApprovalStatus.REJECTED;
+  }) => Promise<void>;
 }
 
 export async function actOnApprovalRequest(
@@ -146,6 +155,16 @@ export async function actOnApprovalRequest(
       tx,
     );
 
-    return { ...updated, actions };
+    const resolved = { ...updated, actions };
+
+    if (
+      input.onResolved &&
+      (result.request.status === ApprovalStatus.APPROVED ||
+        result.request.status === ApprovalStatus.REJECTED)
+    ) {
+      await input.onResolved({ tx, approvalRequest: resolved, resolution: result.request.status });
+    }
+
+    return resolved;
   });
 }

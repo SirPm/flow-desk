@@ -6,6 +6,8 @@ import { useChangeRequests } from '../hooks/useChangeRequests';
 import { useReviewChangeRequest } from '../hooks/useReviewChangeRequest';
 import { EditEmployeeInfoForm } from '../components/EditEmployeeInfoForm';
 import { ChangeRequestCard } from '../components/ChangeRequestCard';
+import { ChangeRequestWorkflowSettings } from '../components/ChangeRequestWorkflowSettings';
+import { canReviewChangeRequest } from '../utils';
 import type { ChangeRequestDecision, ChangeRequestStatus } from '../types';
 
 const STATUS_FILTERS: { label: string; value: ChangeRequestStatus | undefined }[] = [
@@ -24,7 +26,6 @@ export function ChangeRequestsPage() {
   const reviewChangeRequest = useReviewChangeRequest();
 
   const canCreate = role === 'ADMIN' || role === 'MANAGER';
-  const canReview = role === 'ADMIN';
   const changeRequestsEnabled = organization?.featureFlags.changeRequests !== false;
 
   function handleReview(id: string, decision: ChangeRequestDecision) {
@@ -46,6 +47,13 @@ export function ChangeRequestsPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold text-slate-900">Change Requests</h1>
+
+      {canCreate && (
+        <ChangeRequestWorkflowSettings
+          changeRequestTemplateId={organization?.changeRequestTemplateId ?? null}
+          canEdit={role === 'ADMIN'}
+        />
+      )}
 
       {canCreate && <EditEmployeeInfoForm />}
 
@@ -80,7 +88,7 @@ export function ChangeRequestsPage() {
             <ChangeRequestCard
               key={request.id}
               request={request}
-              canReview={canReview}
+              canReview={canReviewChangeRequest(request, role)}
               onReview={handleReview}
               isReviewing={reviewChangeRequest.isPending}
             />

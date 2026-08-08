@@ -1,13 +1,19 @@
 import {
+  ApprovalActionType,
+  ApprovalStatus,
   ChangeRequestField,
   ChangeRequestStatus,
   EmploymentType,
+  Role,
+  type ApprovalAction,
   type ChangeRequest,
+  type Prisma,
 } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { logAction } from './auditLogger';
 import { buildUserUpdateData } from './scheduling';
+import { actOnApprovalRequest, createApprovalRequest } from './approvalRequestService';
 
 export interface CreateChangeRequestInput {
   employeeId: string;
@@ -72,7 +78,25 @@ export async function createChangeRequest(input: CreateChangeRequestInput): Prom
     allowEmpty: false,
   });
 
+  const organization = await prisma.organization.findUnique({
+    where: { id: input.organizationId },
+  });
+  if (!organization?.changeRequestTemplateId) {
+    throw new ValidationError(
+      'This organization has no default change-request approval template configured. Ask an admin to set one first.',
+    );
+  }
+
   return prisma.$transaction(async (tx) => {
+    const approvalRequest = await createApprovalRequest(
+      {
+        workflowTemplateId: organization.changeRequestTemplateId!,
+        requestedBy: input.actorId,
+        organizationId: input.organizationId,
+      },
+      tx,
+    );
+
     const request = await tx.changeRequest.create({
       data: {
         employeeId: input.employeeId,
@@ -80,6 +104,7 @@ export async function createChangeRequest(input: CreateChangeRequestInput): Prom
         oldValue: input.oldValue,
         newValue: input.newValue,
         effectiveDate: input.effectiveDate,
+        approvalRequestId: approvalRequest.id,
       },
     });
 
@@ -89,7 +114,11 @@ export async function createChangeRequest(input: CreateChangeRequestInput): Prom
         action: 'CHANGE_REQUEST_CREATED',
         entityType: 'ChangeRequest',
         entityId: request.id,
-        metadata: { employeeId: request.employeeId, fieldChanged: request.fieldChanged },
+        metadata: {
+          employeeId: request.employeeId,
+          fieldChanged: request.fieldChanged,
+          approvalRequestId: approvalRequest.id,
+        },
       },
       tx,
     );
@@ -100,7 +129,20 @@ export async function createChangeRequest(input: CreateChangeRequestInput): Prom
 
 type ChangeRequestWithEmployee = ChangeRequest & {
   employee: { id: string; name: string; email: string };
+  approvalRequest: {
+    id: string;
+    currentStep: number;
+    status: ApprovalStatus;
+    workflowTemplate: { steps: Role[]; name: string };
+  };
 };
+
+const approvalRequestSummarySelect = {
+  id: true,
+  currentStep: true,
+  status: true,
+  workflowTemplate: { select: { steps: true, name: true } },
+} as const;
 
 export interface ListChangeRequestsOptions {
   organizationId: string;
@@ -117,7 +159,10 @@ export function listChangeRequests(
       ...(options.employeeId ? { employeeId: options.employeeId } : {}),
       ...(options.status ? { status: options.status } : {}),
     },
-    include: { employee: { select: { id: true, name: true, email: true } } },
+    include: {
+      employee: { select: { id: true, name: true, email: true } },
+      approvalRequest: { select: approvalRequestSummarySelect },
+    },
     orderBy: { createdAt: 'desc' },
   });
 }
@@ -125,10 +170,20 @@ export function listChangeRequests(
 export async function getChangeRequestById(
   id: string,
   organizationId: string,
-): Promise<ChangeRequestWithEmployee> {
+): Promise<
+  ChangeRequestWithEmployee & { approvalRequest: { actions: ApprovalAction[] } }
+> {
   const request = await prisma.changeRequest.findUnique({
     where: { id },
-    include: { employee: { select: { id: true, name: true, email: true, organizationId: true } } },
+    include: {
+      employee: { select: { id: true, name: true, email: true, organizationId: true } },
+      approvalRequest: {
+        select: {
+          ...approvalRequestSummarySelect,
+          actions: { orderBy: { timestamp: 'asc' } },
+        },
+      },
+    },
   });
 
   if (!request || request.employee.organizationId !== organizationId) {
@@ -144,7 +199,74 @@ export interface ReviewChangeRequestInput {
   id: string;
   organizationId: string;
   actorId: string;
+  actorRole: Role;
   decision: ChangeRequestDecision;
+}
+
+async function applyChangeRequestResolution(
+  tx: Prisma.TransactionClient,
+  request: ChangeRequest,
+  resolution: typeof ApprovalStatus.APPROVED | typeof ApprovalStatus.REJECTED,
+  actorId: string,
+): Promise<void> {
+  if (resolution === ApprovalStatus.REJECTED) {
+    await tx.changeRequest.update({
+      where: { id: request.id },
+      data: { status: ChangeRequestStatus.REJECTED },
+    });
+    await logAction(
+      {
+        actorId,
+        action: 'CHANGE_REQUEST_REJECTED',
+        entityType: 'ChangeRequest',
+        entityId: request.id,
+      },
+      tx,
+    );
+    return;
+  }
+
+  const isEffectiveImmediately = request.effectiveDate <= new Date();
+  const status = isEffectiveImmediately
+    ? ChangeRequestStatus.APPLIED
+    : ChangeRequestStatus.SCHEDULED;
+
+  if (isEffectiveImmediately) {
+    await tx.user.update({
+      where: { id: request.employeeId },
+      data: buildUserUpdateData(request.fieldChanged, request.newValue),
+    });
+  }
+
+  await tx.changeRequest.update({ where: { id: request.id }, data: { status } });
+
+  await logAction(
+    {
+      actorId,
+      action: 'CHANGE_REQUEST_APPROVED',
+      entityType: 'ChangeRequest',
+      entityId: request.id,
+    },
+    tx,
+  );
+
+  if (isEffectiveImmediately) {
+    await logAction(
+      {
+        actorId,
+        action: 'CHANGE_REQUEST_APPLIED',
+        entityType: 'ChangeRequest',
+        entityId: request.id,
+        metadata: {
+          employeeId: request.employeeId,
+          fieldChanged: request.fieldChanged,
+          newValue: request.newValue,
+          automated: false,
+        },
+      },
+      tx,
+    );
+  }
 }
 
 export async function reviewChangeRequest(input: ReviewChangeRequestInput): Promise<ChangeRequest> {
@@ -161,73 +283,18 @@ export async function reviewChangeRequest(input: ReviewChangeRequestInput): Prom
     throw new ValidationError('Only pending change requests can be reviewed');
   }
 
-  if (input.decision === 'REJECT') {
-    return prisma.$transaction(async (tx) => {
-      const updated = await tx.changeRequest.update({
-        where: { id: input.id },
-        data: { status: ChangeRequestStatus.REJECTED },
-      });
+  const decisionActionType =
+    input.decision === 'APPROVE' ? ApprovalActionType.APPROVE : ApprovalActionType.REJECT;
 
-      await logAction(
-        {
-          actorId: input.actorId,
-          action: 'CHANGE_REQUEST_REJECTED',
-          entityType: 'ChangeRequest',
-          entityId: input.id,
-        },
-        tx,
-      );
-
-      return updated;
-    });
-  }
-
-  const isEffectiveImmediately = request.effectiveDate <= new Date();
-  const status = isEffectiveImmediately
-    ? ChangeRequestStatus.APPLIED
-    : ChangeRequestStatus.SCHEDULED;
-
-  return prisma.$transaction(async (tx) => {
-    if (isEffectiveImmediately) {
-      await tx.user.update({
-        where: { id: request.employeeId },
-        data: buildUserUpdateData(request.fieldChanged, request.newValue),
-      });
-    }
-
-    const updated = await tx.changeRequest.update({
-      where: { id: input.id },
-      data: { status },
-    });
-
-    await logAction(
-      {
-        actorId: input.actorId,
-        action: 'CHANGE_REQUEST_APPROVED',
-        entityType: 'ChangeRequest',
-        entityId: input.id,
-      },
-      tx,
-    );
-
-    if (isEffectiveImmediately) {
-      await logAction(
-        {
-          actorId: input.actorId,
-          action: 'CHANGE_REQUEST_APPLIED',
-          entityType: 'ChangeRequest',
-          entityId: input.id,
-          metadata: {
-            employeeId: request.employeeId,
-            fieldChanged: request.fieldChanged,
-            newValue: request.newValue,
-            automated: false,
-          },
-        },
-        tx,
-      );
-    }
-
-    return updated;
+  await actOnApprovalRequest({
+    id: request.approvalRequestId,
+    organizationId: input.organizationId,
+    actorId: input.actorId,
+    actorRole: input.actorRole,
+    decision: decisionActionType,
+    onResolved: ({ tx, resolution }) =>
+      applyChangeRequestResolution(tx, request, resolution, input.actorId),
   });
+
+  return prisma.changeRequest.findUniqueOrThrow({ where: { id: input.id } });
 }

@@ -18,3 +18,13 @@ export async function setFeatureFlag(payload: SetFeatureFlagPayload): Promise<Or
   );
   return data.organization;
 }
+
+export async function setChangeRequestTemplate(
+  workflowTemplateId: string | null,
+): Promise<Organization> {
+  const { data } = await apiClient.patch<{ organization: Organization }>(
+    '/organizations/change-request-template',
+    { workflowTemplateId },
+  );
+  return data.organization;
+}

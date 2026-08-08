@@ -9,6 +9,7 @@ import { WorkflowsPage } from './features/workflows/pages/WorkflowsPage';
 import { ApprovalsPage } from './features/approvals/pages/ApprovalsPage';
 import { ApprovalRequestDetailPage } from './features/approvals/pages/ApprovalRequestDetailPage';
 import { ChangeRequestsPage } from './features/change-requests/pages/ChangeRequestsPage';
+import { ChangeRequestDetailPage } from './features/change-requests/pages/ChangeRequestDetailPage';
 import { EmployeesPage } from './features/users/pages/EmployeesPage';
 import { AuditLogPage } from './features/audit-log/pages/AuditLogPage';
 import { FeatureFlagsPage } from './features/organization/pages/FeatureFlagsPage';
@@ -26,6 +27,7 @@ function AppRoutes() {
           <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/approvals/:id" element={<ApprovalRequestDetailPage />} />
           <Route path="/change-requests" element={<ChangeRequestsPage />} />
+          <Route path="/change-requests/:id" element={<ChangeRequestDetailPage />} />
           <Route path="/employees" element={<EmployeesPage />} />
           <Route path="/audit-log" element={<AuditLogPage />} />
           <Route path="/feature-flags" element={<FeatureFlagsPage />} />

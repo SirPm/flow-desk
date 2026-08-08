@@ -35,6 +35,7 @@ describe('auth.service', () => {
         id: 'org_1',
         name: 'Acme Corp',
         featureFlags: {},
+        changeRequestTemplateId: null,
         createdAt: now,
         updatedAt: now,
       });

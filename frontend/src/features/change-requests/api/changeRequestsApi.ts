@@ -20,6 +20,11 @@ export async function listChangeRequests(
   return data.changeRequests;
 }
 
+export async function getChangeRequestById(id: string): Promise<ChangeRequest> {
+  const { data } = await apiClient.get<{ changeRequest: ChangeRequest }>(`/change-requests/${id}`);
+  return data.changeRequest;
+}
+
 export interface CreateChangeRequestPayload {
   employeeId: string;
   fieldChanged: ChangeRequestField;

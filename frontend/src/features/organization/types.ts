@@ -2,6 +2,7 @@ export interface Organization {
   id: string;
   name: string;
   featureFlags: Record<string, boolean>;
+  changeRequestTemplateId: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -133,11 +133,28 @@ async function upsertChangeRequest(
   newValue: string,
   effectiveDate: Date,
   status: ChangeRequestStatus,
+  approvalRequestId: string,
 ) {
   return prisma.changeRequest.upsert({
     where: { id },
     update: {},
-    create: { id, employeeId, fieldChanged, oldValue, newValue, effectiveDate, status },
+    create: {
+      id,
+      employeeId,
+      fieldChanged,
+      oldValue,
+      newValue,
+      effectiveDate,
+      status,
+      approvalRequestId,
+    },
+  });
+}
+
+async function setDefaultChangeRequestTemplate(organizationId: string, workflowTemplateId: string) {
+  await prisma.organization.update({
+    where: { id: organizationId },
+    data: { changeRequestTemplateId: workflowTemplateId },
   });
 }
 
@@ -268,6 +285,14 @@ async function seedAcme(passwordHash: string): Promise<void> {
     admin.id,
     acme.id,
   );
+  const changeRequestTemplate = await upsertWorkflowTemplate(
+    'wft_acme_change_request',
+    'Employee Change Request',
+    [Role.MANAGER, Role.ADMIN],
+    admin.id,
+    acme.id,
+  );
+  await setDefaultChangeRequestTemplate(acme.id, changeRequestTemplate.id);
 
   // Awaiting the manager step.
   await upsertApprovalRequest(
@@ -390,9 +415,33 @@ async function seedAcme(passwordHash: string): Promise<void> {
     },
   );
 
-  // Change requests across every status. Evan's current position/department/salary/employmentType
-  // (set above) reflect the outcome of these: pending/scheduled haven't taken effect yet, applied
-  // already did, rejected never did.
+  // Change requests across every status, each backed by an ApprovalRequest against the 2-step
+  // [MANAGER, ADMIN] change-request template. Evan's current position/department/salary/
+  // employmentType (set above) reflect the outcome of these: pending/scheduled haven't taken
+  // effect yet, applied already did, rejected never did.
+
+  // Manager already approved; awaiting admin (mid-chain PENDING).
+  await upsertApprovalRequest(
+    'req_acme_cr_pending',
+    changeRequestTemplate.id,
+    1,
+    ApprovalStatus.PENDING,
+    employee.id,
+  );
+  await upsertApprovalAction(
+    'action_cr_pending_1',
+    'req_acme_cr_pending',
+    manager.id,
+    ApprovalActionType.APPROVE,
+  );
+  await upsertAuditLog(
+    'audit_approval_cr_pending_1',
+    manager.id,
+    'APPROVAL_APPROVE',
+    'ApprovalRequest',
+    'req_acme_cr_pending',
+    { decision: 'APPROVE', permissionOverride: false },
+  );
   await upsertChangeRequest(
     'cr_acme_pending',
     employee.id,
@@ -401,6 +450,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
     seniorAssociate.id,
     addDays(30),
     ChangeRequestStatus.PENDING,
+    'req_acme_cr_pending',
   );
   await upsertAuditLog(
     'audit_cr_pending_1',
@@ -411,6 +461,42 @@ async function seedAcme(passwordHash: string): Promise<void> {
     { employeeId: employee.id, fieldChanged: ChangeRequestField.POSITION },
   );
 
+  // Fully approved (manager, then admin).
+  await upsertApprovalRequest(
+    'req_acme_cr_scheduled',
+    changeRequestTemplate.id,
+    2,
+    ApprovalStatus.APPROVED,
+    employee.id,
+  );
+  await upsertApprovalAction(
+    'action_cr_scheduled_1',
+    'req_acme_cr_scheduled',
+    manager.id,
+    ApprovalActionType.APPROVE,
+  );
+  await upsertApprovalAction(
+    'action_cr_scheduled_2',
+    'req_acme_cr_scheduled',
+    admin.id,
+    ApprovalActionType.APPROVE,
+  );
+  await upsertAuditLog(
+    'audit_approval_cr_scheduled_1',
+    manager.id,
+    'APPROVAL_APPROVE',
+    'ApprovalRequest',
+    'req_acme_cr_scheduled',
+    { decision: 'APPROVE', permissionOverride: false },
+  );
+  await upsertAuditLog(
+    'audit_approval_cr_scheduled_2',
+    admin.id,
+    'APPROVAL_APPROVE',
+    'ApprovalRequest',
+    'req_acme_cr_scheduled',
+    { decision: 'APPROVE', permissionOverride: false },
+  );
   await upsertChangeRequest(
     'cr_acme_scheduled',
     employee.id,
@@ -419,6 +505,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
     marketing.id,
     addDays(14),
     ChangeRequestStatus.SCHEDULED,
+    'req_acme_cr_scheduled',
   );
   await upsertAuditLog(
     'audit_cr_scheduled_1',
@@ -436,6 +523,42 @@ async function seedAcme(passwordHash: string): Promise<void> {
     'cr_acme_scheduled',
   );
 
+  // Fully approved (manager, then admin), and its effective date has already passed.
+  await upsertApprovalRequest(
+    'req_acme_cr_applied',
+    changeRequestTemplate.id,
+    2,
+    ApprovalStatus.APPROVED,
+    employee.id,
+  );
+  await upsertApprovalAction(
+    'action_cr_applied_1',
+    'req_acme_cr_applied',
+    manager.id,
+    ApprovalActionType.APPROVE,
+  );
+  await upsertApprovalAction(
+    'action_cr_applied_2',
+    'req_acme_cr_applied',
+    admin.id,
+    ApprovalActionType.APPROVE,
+  );
+  await upsertAuditLog(
+    'audit_approval_cr_applied_1',
+    manager.id,
+    'APPROVAL_APPROVE',
+    'ApprovalRequest',
+    'req_acme_cr_applied',
+    { decision: 'APPROVE', permissionOverride: false },
+  );
+  await upsertAuditLog(
+    'audit_approval_cr_applied_2',
+    admin.id,
+    'APPROVAL_APPROVE',
+    'ApprovalRequest',
+    'req_acme_cr_applied',
+    { decision: 'APPROVE', permissionOverride: false },
+  );
   await upsertChangeRequest(
     'cr_acme_applied',
     employee.id,
@@ -444,6 +567,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
     '72000',
     addDays(-14),
     ChangeRequestStatus.APPLIED,
+    'req_acme_cr_applied',
   );
   await upsertAuditLog(
     'audit_cr_applied_1',
@@ -474,6 +598,33 @@ async function seedAcme(passwordHash: string): Promise<void> {
     },
   );
 
+  // Rejected at the manager step.
+  await upsertApprovalRequest(
+    'req_acme_cr_rejected',
+    changeRequestTemplate.id,
+    0,
+    ApprovalStatus.REJECTED,
+    employee.id,
+  );
+  await upsertApprovalAction(
+    'action_cr_rejected_1',
+    'req_acme_cr_rejected',
+    manager.id,
+    ApprovalActionType.REJECT,
+    'Employment type change not approved this cycle',
+  );
+  await upsertAuditLog(
+    'audit_approval_cr_rejected_1',
+    manager.id,
+    'APPROVAL_REJECT',
+    'ApprovalRequest',
+    'req_acme_cr_rejected',
+    {
+      decision: 'REJECT',
+      note: 'Employment type change not approved this cycle',
+      permissionOverride: false,
+    },
+  );
   await upsertChangeRequest(
     'cr_acme_rejected',
     employee.id,
@@ -482,6 +633,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
     EmploymentType.FULL_TIME,
     addDays(7),
     ChangeRequestStatus.REJECTED,
+    'req_acme_cr_rejected',
   );
   await upsertAuditLog(
     'audit_cr_rejected_1',
@@ -507,9 +659,17 @@ async function seedAcme(passwordHash: string): Promise<void> {
     acme.id,
     { key: 'changeRequests', enabled: true },
   );
+  await upsertAuditLog(
+    'audit_change_request_template_1',
+    admin.id,
+    'CHANGE_REQUEST_TEMPLATE_SET',
+    'Organization',
+    acme.id,
+    { workflowTemplateId: changeRequestTemplate.id },
+  );
 
   console.log(
-    `Seeded "${acme.name}": 4 users, 3 workflow templates, 5 approval requests, 4 change requests.`,
+    `Seeded "${acme.name}": 4 users, 4 workflow templates, 9 approval requests, 4 change requests.`,
   );
 }
 

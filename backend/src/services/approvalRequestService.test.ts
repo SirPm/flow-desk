@@ -56,6 +56,36 @@ describe('createApprovalRequest', () => {
       }),
     );
   });
+
+  it('uses an injected client for both the template lookup and the create', async () => {
+    const client = {
+      workflowTemplate: { findUnique: jest.fn().mockResolvedValue(template) },
+      approvalRequest: {
+        create: jest.fn().mockResolvedValue({
+          id: 'req_1',
+          workflowTemplateId: 'wft_1',
+          currentStep: 0,
+          status: ApprovalStatus.PENDING,
+          requestedBy: 'user_1',
+          createdAt: now,
+          updatedAt: now,
+        }),
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    const prismaTemplateSpy = jest.spyOn(prisma.workflowTemplate, 'findUnique');
+    const prismaCreateSpy = jest.spyOn(prisma.approvalRequest, 'create');
+
+    await createApprovalRequest(
+      { workflowTemplateId: 'wft_1', requestedBy: 'user_1', organizationId: 'org_1' },
+      client,
+    );
+
+    expect(client.workflowTemplate.findUnique).toHaveBeenCalled();
+    expect(client.approvalRequest.create).toHaveBeenCalled();
+    expect(prismaTemplateSpy).not.toHaveBeenCalled();
+    expect(prismaCreateSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('listApprovalRequests', () => {
@@ -198,5 +228,113 @@ describe('actOnApprovalRequest', () => {
         decision: ApprovalActionType.APPROVE,
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('does not invoke onResolved when the decision leaves the request pending', async () => {
+    const pendingRequest = {
+      id: 'req_1',
+      workflowTemplateId: 'wft_1',
+      currentStep: 0,
+      status: ApprovalStatus.PENDING,
+      requestedBy: 'user_1',
+      createdAt: now,
+      updatedAt: now,
+      workflowTemplate: { steps: [Role.MANAGER, Role.FINANCE], organizationId: 'org_1' },
+    };
+    jest.spyOn(prisma.approvalRequest, 'findUnique').mockResolvedValue(pendingRequest);
+    jest
+      .spyOn(prisma.approvalRequest, 'update')
+      .mockResolvedValue({ ...pendingRequest, currentStep: 1 });
+    jest.spyOn(prisma.approvalAction, 'create').mockResolvedValue({} as never);
+    jest.spyOn(prisma.approvalAction, 'findMany').mockResolvedValue([]);
+    jest.spyOn(prisma.auditLog, 'create').mockResolvedValue({} as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    jest.spyOn(prisma, '$transaction').mockImplementation((fn: any) => fn(prisma));
+    const onResolved = jest.fn().mockResolvedValue(undefined);
+
+    await actOnApprovalRequest({
+      id: 'req_1',
+      organizationId: 'org_1',
+      actorId: 'user_manager',
+      actorRole: Role.MANAGER,
+      decision: ApprovalActionType.APPROVE,
+      onResolved,
+    });
+
+    expect(onResolved).not.toHaveBeenCalled();
+  });
+
+  it('invokes onResolved with the resolution when the final step approves', async () => {
+    const finalStepRequest = {
+      id: 'req_1',
+      workflowTemplateId: 'wft_1',
+      currentStep: 1,
+      status: ApprovalStatus.PENDING,
+      requestedBy: 'user_1',
+      createdAt: now,
+      updatedAt: now,
+      workflowTemplate: { steps: [Role.MANAGER, Role.FINANCE], organizationId: 'org_1' },
+    };
+    jest.spyOn(prisma.approvalRequest, 'findUnique').mockResolvedValue(finalStepRequest);
+    jest.spyOn(prisma.approvalRequest, 'update').mockResolvedValue({
+      ...finalStepRequest,
+      currentStep: 2,
+      status: ApprovalStatus.APPROVED,
+    });
+    jest.spyOn(prisma.approvalAction, 'create').mockResolvedValue({} as never);
+    jest.spyOn(prisma.approvalAction, 'findMany').mockResolvedValue([]);
+    jest.spyOn(prisma.auditLog, 'create').mockResolvedValue({} as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    jest.spyOn(prisma, '$transaction').mockImplementation((fn: any) => fn(prisma));
+    const onResolved = jest.fn().mockResolvedValue(undefined);
+
+    await actOnApprovalRequest({
+      id: 'req_1',
+      organizationId: 'org_1',
+      actorId: 'user_finance',
+      actorRole: Role.FINANCE,
+      decision: ApprovalActionType.APPROVE,
+      onResolved,
+    });
+
+    expect(onResolved).toHaveBeenCalledWith(
+      expect.objectContaining({ resolution: ApprovalStatus.APPROVED }),
+    );
+  });
+
+  it('invokes onResolved with REJECTED when the decision is a reject', async () => {
+    const pendingRequest = {
+      id: 'req_1',
+      workflowTemplateId: 'wft_1',
+      currentStep: 0,
+      status: ApprovalStatus.PENDING,
+      requestedBy: 'user_1',
+      createdAt: now,
+      updatedAt: now,
+      workflowTemplate: { steps: [Role.MANAGER, Role.FINANCE], organizationId: 'org_1' },
+    };
+    jest.spyOn(prisma.approvalRequest, 'findUnique').mockResolvedValue(pendingRequest);
+    jest
+      .spyOn(prisma.approvalRequest, 'update')
+      .mockResolvedValue({ ...pendingRequest, status: ApprovalStatus.REJECTED });
+    jest.spyOn(prisma.approvalAction, 'create').mockResolvedValue({} as never);
+    jest.spyOn(prisma.approvalAction, 'findMany').mockResolvedValue([]);
+    jest.spyOn(prisma.auditLog, 'create').mockResolvedValue({} as never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    jest.spyOn(prisma, '$transaction').mockImplementation((fn: any) => fn(prisma));
+    const onResolved = jest.fn().mockResolvedValue(undefined);
+
+    await actOnApprovalRequest({
+      id: 'req_1',
+      organizationId: 'org_1',
+      actorId: 'user_manager',
+      actorRole: Role.MANAGER,
+      decision: ApprovalActionType.REJECT,
+      onResolved,
+    });
+
+    expect(onResolved).toHaveBeenCalledWith(
+      expect.objectContaining({ resolution: ApprovalStatus.REJECTED }),
+    );
   });
 });

@@ -64,12 +64,13 @@ changeRequestsRouter.get('/:id', async (req, res) => {
   res.status(200).json({ changeRequest: request });
 });
 
-changeRequestsRouter.post('/:id/review', authorize(Role.ADMIN), async (req, res) => {
+changeRequestsRouter.post('/:id/review', async (req, res) => {
   const input = parseOrThrow(reviewSchema, req.body);
   const request = await reviewChangeRequest({
     id: req.params.id as string,
     organizationId: req.user!.organizationId,
     actorId: req.user!.sub,
+    actorRole: req.user!.role,
     decision: input.decision,
   });
   res.status(200).json({ changeRequest: request });
