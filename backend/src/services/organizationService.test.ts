@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { getOrganization, setChangeRequestTemplate, setFeatureFlag } from './organizationService';
-import { NotFoundError } from '../lib/errors';
+import { NotFoundError, ValidationError } from '../lib/errors';
 
 const now = new Date();
 
@@ -76,6 +76,8 @@ describe('setChangeRequestTemplate', () => {
       id: 'wft_1',
       name: 'Change Request',
       steps: ['MANAGER'],
+      isChangeRequestTemplate: true,
+      changeRequestFields: [],
       createdBy: 'user_admin',
       organizationId: 'org_2',
       createdAt: now,
@@ -91,12 +93,37 @@ describe('setChangeRequestTemplate', () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
+  it('rejects a template that is not enabled for change requests', async () => {
+    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue(organization);
+    jest.spyOn(prisma.workflowTemplate, 'findUnique').mockResolvedValue({
+      id: 'wft_1',
+      name: 'Expense Approval',
+      steps: ['MANAGER'],
+      isChangeRequestTemplate: false,
+      changeRequestFields: [],
+      createdBy: 'user_admin',
+      organizationId: 'org_1',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await expect(
+      setChangeRequestTemplate({
+        organizationId: 'org_1',
+        actorId: 'user_admin',
+        workflowTemplateId: 'wft_1',
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
   it('sets the template id and logs the change', async () => {
     jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue(organization);
     jest.spyOn(prisma.workflowTemplate, 'findUnique').mockResolvedValue({
       id: 'wft_1',
       name: 'Change Request',
       steps: ['MANAGER'],
+      isChangeRequestTemplate: true,
+      changeRequestFields: [],
       createdBy: 'user_admin',
       organizationId: 'org_1',
       createdAt: now,

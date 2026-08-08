@@ -1,6 +1,6 @@
 import { type Organization } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import { NotFoundError } from '../lib/errors';
+import { NotFoundError, ValidationError } from '../lib/errors';
 import { logAction } from './auditLogger';
 
 export async function getOrganization(id: string): Promise<Organization> {
@@ -63,6 +63,11 @@ export async function setChangeRequestTemplate(
     });
     if (!template || template.organizationId !== input.organizationId) {
       throw new NotFoundError('Workflow template not found');
+    }
+    if (!template.isChangeRequestTemplate) {
+      throw new ValidationError(
+        'This template is not enabled for change requests. Enable it when creating a template, or choose a different one.',
+      );
     }
   }
 

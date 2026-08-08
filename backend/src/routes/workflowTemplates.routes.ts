@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { Role } from '@prisma/client';
+import { ChangeRequestField, Role } from '@prisma/client';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { parseOrThrow } from '../lib/validate';
 import {
@@ -14,6 +14,8 @@ export const workflowTemplatesRouter = Router();
 const createSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   steps: z.array(z.nativeEnum(Role)).min(1, 'At least one approval step is required'),
+  isChangeRequestTemplate: z.boolean().default(false),
+  changeRequestFields: z.array(z.nativeEnum(ChangeRequestField)).default([]),
 });
 
 workflowTemplatesRouter.use(authenticate);

@@ -13,6 +13,8 @@ const template = {
   id: 'wft_1',
   name: 'Expense approval',
   steps: [Role.MANAGER, Role.FINANCE],
+  isChangeRequestTemplate: false,
+  changeRequestFields: [],
   createdBy: 'user_admin',
   organizationId: 'org_1',
   createdAt: now,

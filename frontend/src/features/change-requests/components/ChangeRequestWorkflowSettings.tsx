@@ -1,6 +1,7 @@
 import { useWorkflowTemplates } from '../../workflows/hooks/useWorkflowTemplates';
 import { useSetChangeRequestTemplate } from '../../organization/hooks/useSetChangeRequestTemplate';
 import { getErrorMessage } from '../../../lib/apiClient';
+import { CHANGE_REQUEST_FIELD_LABELS } from '../utils';
 
 export function ChangeRequestWorkflowSettings({
   changeRequestTemplateId,
@@ -9,9 +10,10 @@ export function ChangeRequestWorkflowSettings({
   changeRequestTemplateId: string | null;
   canEdit: boolean;
 }) {
-  const { data: templates, isLoading } = useWorkflowTemplates();
+  const { data: allTemplates, isLoading } = useWorkflowTemplates();
   const setChangeRequestTemplate = useSetChangeRequestTemplate();
 
+  const templates = allTemplates?.filter((template) => template.isChangeRequestTemplate);
   const currentTemplate = templates?.find((template) => template.id === changeRequestTemplateId);
 
   return (
@@ -19,9 +21,19 @@ export function ChangeRequestWorkflowSettings({
       <div className="min-w-0">
         <p className="text-sm font-medium text-slate-700">Review workflow</p>
         {currentTemplate ? (
-          <p className="mt-1 text-xs text-slate-500">
-            {currentTemplate.name} · {currentTemplate.steps.join(' → ')}
-          </p>
+          <>
+            <p className="mt-1 text-xs text-slate-500">
+              {currentTemplate.name} · {currentTemplate.steps.join(' → ')}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              Applies to:{' '}
+              {currentTemplate.changeRequestFields.length > 0
+                ? currentTemplate.changeRequestFields
+                    .map((field) => CHANGE_REQUEST_FIELD_LABELS[field])
+                    .join(', ')
+                : 'all fields'}
+            </p>
+          </>
         ) : (
           <p className="mt-1 text-xs text-amber-600">
             No default template configured — change requests can&apos;t be created until an admin

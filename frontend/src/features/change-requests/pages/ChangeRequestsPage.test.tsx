@@ -36,6 +36,8 @@ const workflowTemplate: WorkflowTemplate = {
   id: 'wft_change_request',
   name: 'Employee Change Request',
   steps: ['MANAGER', 'ADMIN'],
+  isChangeRequestTemplate: true,
+  changeRequestFields: [],
   createdBy: 'user_admin',
   organizationId: 'org_1',
   createdAt: new Date().toISOString(),
@@ -161,6 +163,20 @@ describe('ChangeRequestsPage role gating', () => {
     renderPage('ADMIN');
 
     expect(await screen.findByText(/no default template configured/i)).toBeInTheDocument();
+  });
+
+  it('only offers fields the default template covers in the create form', async () => {
+    jest.spyOn(workflowsApi, 'listWorkflowTemplates').mockResolvedValue([
+      { ...workflowTemplate, changeRequestFields: ['POSITION'] },
+    ]);
+
+    renderPage('ADMIN');
+
+    await screen.findByText('Edit employee info');
+    const fieldSelect = (await screen.findByLabelText('Field')) as HTMLSelectElement;
+    const optionLabels = Array.from(fieldSelect.options).map((option) => option.textContent);
+
+    expect(optionLabels).toEqual(['Select a field', 'Position']);
   });
 
   it('shows a disabled-feature message when the org has turned change requests off, even for an admin', async () => {

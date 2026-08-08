@@ -38,6 +38,8 @@ const workflowTemplate = {
   id: 'wft_change_request',
   name: 'Employee Change Request',
   steps: [Role.MANAGER, Role.ADMIN],
+  isChangeRequestTemplate: true,
+  changeRequestFields: [] as ChangeRequestField[],
   organizationId: 'org_1',
   createdBy: 'user_admin',
   createdAt: now,
@@ -150,6 +152,78 @@ describe('createChangeRequest', () => {
         actorId: 'user_admin',
       }),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('rejects a field the default template does not cover', async () => {
+    jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(employee);
+    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue(organization);
+    jest.spyOn(prisma.workflowTemplate, 'findUnique').mockResolvedValue({
+      ...workflowTemplate,
+      changeRequestFields: [ChangeRequestField.POSITION],
+    });
+
+    await expect(
+      createChangeRequest({
+        employeeId: 'user_employee',
+        fieldChanged: ChangeRequestField.DEPARTMENT,
+        oldValue: '',
+        newValue: 'dept_acme_marketing',
+        effectiveDate,
+        organizationId: 'org_1',
+        actorId: 'user_admin',
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('allows a field the default template explicitly covers', async () => {
+    jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(employee);
+    jest.spyOn(prisma.position, 'findUnique').mockResolvedValue({
+      id: 'pos_1',
+      title: 'Senior Associate',
+      organizationId: 'org_1',
+      createdAt: now,
+      updatedAt: now,
+    });
+    jest.spyOn(prisma.organization, 'findUnique').mockResolvedValue(organization);
+    jest.spyOn(prisma.workflowTemplate, 'findUnique').mockResolvedValue({
+      ...workflowTemplate,
+      changeRequestFields: [ChangeRequestField.POSITION],
+    });
+    mockTransaction();
+    mockAuditLog();
+    jest.spyOn(prisma.approvalRequest, 'create').mockResolvedValue({
+      id: 'req_1',
+      workflowTemplateId: 'wft_change_request',
+      currentStep: 0,
+      status: ApprovalStatus.PENDING,
+      requestedBy: 'user_admin',
+      createdAt: now,
+      updatedAt: now,
+    });
+    jest.spyOn(prisma.changeRequest, 'create').mockResolvedValue({
+      id: 'cr_1',
+      employeeId: 'user_employee',
+      fieldChanged: ChangeRequestField.POSITION,
+      oldValue: '',
+      newValue: 'pos_1',
+      effectiveDate,
+      status: ChangeRequestStatus.PENDING,
+      approvalRequestId: 'req_1',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await createChangeRequest({
+      employeeId: 'user_employee',
+      fieldChanged: ChangeRequestField.POSITION,
+      oldValue: '',
+      newValue: 'pos_1',
+      effectiveDate,
+      organizationId: 'org_1',
+      actorId: 'user_admin',
+    });
+
+    expect(result.status).toBe(ChangeRequestStatus.PENDING);
   });
 
   it('creates a pending change request backed by an approval request, and logs it', async () => {

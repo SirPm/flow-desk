@@ -1,10 +1,12 @@
-import { type Role, type WorkflowTemplate } from '@prisma/client';
+import { type ChangeRequestField, type Role, type WorkflowTemplate } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { NotFoundError } from '../lib/errors';
 
 export interface CreateWorkflowTemplateInput {
   name: string;
   steps: Role[];
+  isChangeRequestTemplate?: boolean;
+  changeRequestFields?: ChangeRequestField[];
   createdBy: string;
   organizationId: string;
 }
@@ -16,6 +18,8 @@ export function createWorkflowTemplate(
     data: {
       name: input.name,
       steps: input.steps,
+      isChangeRequestTemplate: input.isChangeRequestTemplate ?? false,
+      changeRequestFields: input.changeRequestFields ?? [],
       createdBy: input.createdBy,
       organizationId: input.organizationId,
     },

@@ -89,11 +89,22 @@ async function upsertWorkflowTemplate(
   steps: Role[],
   createdBy: string,
   organizationId: string,
+  options: { isChangeRequestTemplate?: boolean; changeRequestFields?: ChangeRequestField[] } = {},
 ) {
+  const isChangeRequestTemplate = options.isChangeRequestTemplate ?? false;
+  const changeRequestFields = options.changeRequestFields ?? [];
   return prisma.workflowTemplate.upsert({
     where: { id },
-    update: {},
-    create: { id, name, steps, createdBy, organizationId },
+    update: { isChangeRequestTemplate, changeRequestFields },
+    create: {
+      id,
+      name,
+      steps,
+      isChangeRequestTemplate,
+      changeRequestFields,
+      createdBy,
+      organizationId,
+    },
   });
 }
 
@@ -235,7 +246,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
       employmentType: EmploymentType.FULL_TIME,
     },
   );
-  const finance = await upsertUser(
+  await upsertUser(
     'user_acme_finance',
     'Fin Ance',
     'finance@acme.test',
@@ -264,156 +275,15 @@ async function seedAcme(passwordHash: string): Promise<void> {
     },
   );
 
-  const expenseTemplate = await upsertWorkflowTemplate(
-    'wft_acme_expense',
-    'Expense Approval',
-    [Role.MANAGER, Role.FINANCE],
-    admin.id,
-    acme.id,
-  );
-  const policyTemplate = await upsertWorkflowTemplate(
-    'wft_acme_policy',
-    'Policy Change',
-    [Role.MANAGER, Role.ADMIN],
-    admin.id,
-    acme.id,
-  );
-  const equipmentTemplate = await upsertWorkflowTemplate(
-    'wft_acme_equipment',
-    'Equipment Request',
-    [Role.MANAGER],
-    admin.id,
-    acme.id,
-  );
   const changeRequestTemplate = await upsertWorkflowTemplate(
     'wft_acme_change_request',
     'Employee Change Request',
     [Role.MANAGER, Role.ADMIN],
     admin.id,
     acme.id,
+    { isChangeRequestTemplate: true },
   );
   await setDefaultChangeRequestTemplate(acme.id, changeRequestTemplate.id);
-
-  // Awaiting the manager step.
-  await upsertApprovalRequest(
-    'req_acme_pending_mgr',
-    expenseTemplate.id,
-    0,
-    ApprovalStatus.PENDING,
-    employee.id,
-  );
-
-  // Manager already approved; awaiting finance.
-  await upsertApprovalRequest(
-    'req_acme_pending_fin',
-    expenseTemplate.id,
-    1,
-    ApprovalStatus.PENDING,
-    employee.id,
-  );
-  await upsertApprovalAction(
-    'action_pending_fin_1',
-    'req_acme_pending_fin',
-    manager.id,
-    ApprovalActionType.APPROVE,
-  );
-  await upsertAuditLog(
-    'audit_pending_fin_1',
-    manager.id,
-    'APPROVAL_APPROVE',
-    'ApprovalRequest',
-    'req_acme_pending_fin',
-    { decision: 'APPROVE', permissionOverride: false },
-  );
-
-  // Fully approved single-step request.
-  await upsertApprovalRequest(
-    'req_acme_approved',
-    equipmentTemplate.id,
-    1,
-    ApprovalStatus.APPROVED,
-    employee.id,
-  );
-  await upsertApprovalAction(
-    'action_approved_1',
-    'req_acme_approved',
-    manager.id,
-    ApprovalActionType.APPROVE,
-  );
-  await upsertAuditLog(
-    'audit_approved_1',
-    manager.id,
-    'APPROVAL_APPROVE',
-    'ApprovalRequest',
-    'req_acme_approved',
-    { decision: 'APPROVE', permissionOverride: false },
-  );
-
-  // Rejected at the manager step.
-  await upsertApprovalRequest(
-    'req_acme_rejected',
-    policyTemplate.id,
-    0,
-    ApprovalStatus.REJECTED,
-    employee.id,
-  );
-  await upsertApprovalAction(
-    'action_rejected_1',
-    'req_acme_rejected',
-    manager.id,
-    ApprovalActionType.REJECT,
-    'Budget not approved for this quarter',
-  );
-  await upsertAuditLog(
-    'audit_rejected_1',
-    manager.id,
-    'APPROVAL_REJECT',
-    'ApprovalRequest',
-    'req_acme_rejected',
-    { decision: 'REJECT', note: 'Budget not approved for this quarter', permissionOverride: false },
-  );
-
-  // Manager approved, then finance skipped the final step — request lands APPROVED.
-  await upsertApprovalRequest(
-    'req_acme_skip_demo',
-    expenseTemplate.id,
-    2,
-    ApprovalStatus.APPROVED,
-    employee.id,
-  );
-  await upsertApprovalAction(
-    'action_skip_demo_1',
-    'req_acme_skip_demo',
-    manager.id,
-    ApprovalActionType.APPROVE,
-  );
-  await upsertApprovalAction(
-    'action_skip_demo_2',
-    'req_acme_skip_demo',
-    finance.id,
-    ApprovalActionType.SKIP,
-    'No policy conflict, fast-tracking per department head',
-  );
-  await upsertAuditLog(
-    'audit_skip_demo_1',
-    manager.id,
-    'APPROVAL_APPROVE',
-    'ApprovalRequest',
-    'req_acme_skip_demo',
-    { decision: 'APPROVE', permissionOverride: false },
-  );
-  await upsertAuditLog(
-    'audit_skip_demo_2',
-    finance.id,
-    'APPROVAL_SKIP',
-    'ApprovalRequest',
-    'req_acme_skip_demo',
-    {
-      decision: 'SKIP',
-      note: 'No policy conflict, fast-tracking per department head',
-      permissionOverride: false,
-    },
-  );
 
   // Change requests across every status, each backed by an ApprovalRequest against the 2-step
   // [MANAGER, ADMIN] change-request template. Evan's current position/department/salary/
@@ -669,7 +539,7 @@ async function seedAcme(passwordHash: string): Promise<void> {
   );
 
   console.log(
-    `Seeded "${acme.name}": 4 users, 4 workflow templates, 9 approval requests, 4 change requests.`,
+    `Seeded "${acme.name}": 4 users, 1 workflow template, 4 approval requests, 4 change requests.`,
   );
 }
 

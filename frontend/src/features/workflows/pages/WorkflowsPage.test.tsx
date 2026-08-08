@@ -19,6 +19,8 @@ const template: WorkflowTemplate = {
   id: 'wft_1',
   name: 'Employee Change Request',
   steps: ['MANAGER', 'ADMIN'],
+  isChangeRequestTemplate: true,
+  changeRequestFields: [],
   createdBy: 'user_admin',
   organizationId: 'org_1',
   createdAt: new Date().toISOString(),
@@ -89,10 +91,54 @@ describe('WorkflowsPage default change-request template', () => {
     expect(await screen.findByRole('button', { name: 'Unset default' })).toBeInTheDocument();
   });
 
+  it('never shows the set-default affordance or change-request scope for a template not enabled for change requests', async () => {
+    jest.spyOn(workflowsApi, 'listWorkflowTemplates').mockResolvedValue([
+      { ...template, id: 'wft_expense', name: 'Expense Approval', isChangeRequestTemplate: false },
+    ]);
+
+    renderPage('ADMIN');
+
+    await screen.findByText('Expense Approval');
+    expect(screen.queryByRole('button', { name: /default/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Change requests:/)).not.toBeInTheDocument();
+  });
+
   it('hides the set-default affordance for a non-admin', async () => {
     renderPage('MANAGER');
 
     await screen.findByText(template.name);
     expect(screen.queryByRole('button', { name: /default/i })).not.toBeInTheDocument();
+  });
+
+  it('shows "all fields" for an unrestricted template and the specific fields for a scoped one', async () => {
+    jest.spyOn(workflowsApi, 'listWorkflowTemplates').mockResolvedValue([
+      template,
+      { ...template, id: 'wft_2', name: 'Position Only', changeRequestFields: ['POSITION'] },
+    ]);
+
+    renderPage('ADMIN');
+
+    expect(await screen.findByText(/Change requests: all fields/)).toBeInTheDocument();
+    expect(await screen.findByText(/Change requests: Position/)).toBeInTheDocument();
+  });
+
+  it('lets an admin scope a new template to specific change-request fields', async () => {
+    const createTemplateSpy = jest
+      .spyOn(workflowsApi, 'createWorkflowTemplate')
+      .mockResolvedValue({ ...template, id: 'wft_new', changeRequestFields: ['SALARY'] });
+
+    renderPage('ADMIN');
+
+    await userEvent.type(await screen.findByLabelText('Name'), 'Salary Change');
+    await userEvent.click(screen.getByRole('button', { name: 'Add step' }));
+    await userEvent.click(
+      screen.getByLabelText('Usable as a change-request review template'),
+    );
+    await userEvent.click(screen.getByLabelText('Salary'));
+    await userEvent.click(screen.getByRole('button', { name: 'Create template' }));
+
+    expect(createTemplateSpy.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ isChangeRequestTemplate: true, changeRequestFields: ['SALARY'] }),
+    );
   });
 });

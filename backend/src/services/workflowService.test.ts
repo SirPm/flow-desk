@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { ChangeRequestField, Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import {
   createWorkflowTemplate,
@@ -13,6 +13,8 @@ const template = {
   id: 'wft_1',
   name: 'Expense approval',
   steps: [Role.MANAGER, Role.FINANCE],
+  isChangeRequestTemplate: false,
+  changeRequestFields: [],
   createdBy: 'user_1',
   organizationId: 'org_1',
   createdAt: now,
@@ -33,6 +35,80 @@ describe('workflowService', () => {
     expect(result).toEqual(template);
     expect(prisma.workflowTemplate.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ organizationId: 'org_1' }) }),
+    );
+  });
+
+  it('defaults isChangeRequestTemplate to false when not provided', async () => {
+    jest.spyOn(prisma.workflowTemplate, 'create').mockResolvedValue(template);
+
+    await createWorkflowTemplate({
+      name: 'Expense approval',
+      steps: [Role.MANAGER, Role.FINANCE],
+      createdBy: 'user_1',
+      organizationId: 'org_1',
+    });
+
+    expect(prisma.workflowTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isChangeRequestTemplate: false }),
+      }),
+    );
+  });
+
+  it('passes through an explicit isChangeRequestTemplate opt-in', async () => {
+    jest.spyOn(prisma.workflowTemplate, 'create').mockResolvedValue({
+      ...template,
+      isChangeRequestTemplate: true,
+    });
+
+    await createWorkflowTemplate({
+      name: 'Position Change',
+      steps: [Role.MANAGER, Role.ADMIN],
+      isChangeRequestTemplate: true,
+      createdBy: 'user_1',
+      organizationId: 'org_1',
+    });
+
+    expect(prisma.workflowTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isChangeRequestTemplate: true }),
+      }),
+    );
+  });
+
+  it('defaults changeRequestFields to an empty (unrestricted) array when not provided', async () => {
+    jest.spyOn(prisma.workflowTemplate, 'create').mockResolvedValue(template);
+
+    await createWorkflowTemplate({
+      name: 'Expense approval',
+      steps: [Role.MANAGER, Role.FINANCE],
+      createdBy: 'user_1',
+      organizationId: 'org_1',
+    });
+
+    expect(prisma.workflowTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ changeRequestFields: [] }) }),
+    );
+  });
+
+  it('passes through an explicit changeRequestFields scope', async () => {
+    jest.spyOn(prisma.workflowTemplate, 'create').mockResolvedValue({
+      ...template,
+      changeRequestFields: [ChangeRequestField.POSITION],
+    });
+
+    await createWorkflowTemplate({
+      name: 'Position Change',
+      steps: [Role.MANAGER, Role.ADMIN],
+      changeRequestFields: [ChangeRequestField.POSITION],
+      createdBy: 'user_1',
+      organizationId: 'org_1',
+    });
+
+    expect(prisma.workflowTemplate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ changeRequestFields: [ChangeRequestField.POSITION] }),
+      }),
     );
   });
 

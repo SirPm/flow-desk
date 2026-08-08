@@ -1,4 +1,5 @@
 import type { WorkflowTemplate } from '../types';
+import { CHANGE_REQUEST_FIELD_LABELS } from '../../change-requests/utils';
 
 export function TemplateCard({
   template,
@@ -27,9 +28,18 @@ export function TemplateCard({
           )}
         </div>
         <p className="mt-1 text-xs text-slate-500">{template.steps.join(' → ')}</p>
+        {template.isChangeRequestTemplate && (
+          <p className="mt-1 text-xs text-slate-400">
+            {template.changeRequestFields.length > 0
+              ? `Change requests: ${template.changeRequestFields
+                  .map((field) => CHANGE_REQUEST_FIELD_LABELS[field])
+                  .join(', ')}`
+              : 'Change requests: all fields'}
+          </p>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {onSetDefault && (
+        {onSetDefault && template.isChangeRequestTemplate && (
           <button
             type="button"
             disabled={isSettingDefault}

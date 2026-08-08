@@ -87,6 +87,19 @@ export async function createChangeRequest(input: CreateChangeRequestInput): Prom
     );
   }
 
+  const template = await prisma.workflowTemplate.findUnique({
+    where: { id: organization.changeRequestTemplateId },
+  });
+  if (
+    template &&
+    template.changeRequestFields.length > 0 &&
+    !template.changeRequestFields.includes(input.fieldChanged)
+  ) {
+    throw new ValidationError(
+      `The organization's default change-request template does not allow ${input.fieldChanged} changes.`,
+    );
+  }
+
   return prisma.$transaction(async (tx) => {
     const approvalRequest = await createApprovalRequest(
       {

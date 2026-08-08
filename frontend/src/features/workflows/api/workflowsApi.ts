@@ -1,10 +1,13 @@
 import { apiClient } from '../../../lib/apiClient';
 import type { Role } from '../../auth/types';
+import type { ChangeRequestField } from '../../change-requests/types';
 import type { WorkflowTemplate } from '../types';
 
 export interface CreateWorkflowTemplatePayload {
   name: string;
   steps: Role[];
+  isChangeRequestTemplate: boolean;
+  changeRequestFields: ChangeRequestField[];
 }
 
 export async function listWorkflowTemplates(): Promise<WorkflowTemplate[]> {

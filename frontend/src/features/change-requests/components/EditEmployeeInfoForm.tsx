@@ -2,17 +2,17 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { useOrganizationUsers } from '../../users/hooks/useOrganizationUsers';
 import { useDepartments } from '../../organization/hooks/useDepartments';
 import { usePositions } from '../../organization/hooks/usePositions';
+import { useOrganization } from '../../organization/hooks/useOrganization';
+import { useWorkflowTemplates } from '../../workflows/hooks/useWorkflowTemplates';
 import { useCreateChangeRequest } from '../hooks/useCreateChangeRequest';
 import { getErrorMessage } from '../../../lib/apiClient';
 import { EMPLOYMENT_TYPE_LABELS, EMPLOYMENT_TYPE_OPTIONS } from '../../users/constants';
+import { CHANGE_REQUEST_FIELD_LABELS } from '../utils';
 import type { ChangeRequestField } from '../types';
 
-const FIELD_OPTIONS: { value: ChangeRequestField; label: string }[] = [
-  { value: 'POSITION', label: 'Position' },
-  { value: 'DEPARTMENT', label: 'Department' },
-  { value: 'SALARY', label: 'Salary' },
-  { value: 'EMPLOYMENT_TYPE', label: 'Employment Type' },
-];
+const ALL_FIELD_OPTIONS: { value: ChangeRequestField; label: string }[] = (
+  Object.keys(CHANGE_REQUEST_FIELD_LABELS) as ChangeRequestField[]
+).map((value) => ({ value, label: CHANGE_REQUEST_FIELD_LABELS[value] }));
 
 const selectClassName =
   'rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500';
@@ -21,11 +21,23 @@ export function EditEmployeeInfoForm() {
   const { data: users } = useOrganizationUsers();
   const { data: departments } = useDepartments();
   const { data: positions } = usePositions();
+  const { data: organization } = useOrganization();
+  const { data: templates } = useWorkflowTemplates();
   const [employeeId, setEmployeeId] = useState('');
   const [fieldChanged, setFieldChanged] = useState<ChangeRequestField | ''>('');
   const [newValue, setNewValue] = useState('');
   const [effectiveDate, setEffectiveDate] = useState('');
   const createChangeRequest = useCreateChangeRequest();
+
+  const currentTemplate = templates?.find(
+    (template) => template.id === organization?.changeRequestTemplateId,
+  );
+  const FIELD_OPTIONS =
+    currentTemplate && currentTemplate.changeRequestFields.length > 0
+      ? ALL_FIELD_OPTIONS.filter((option) =>
+          currentTemplate.changeRequestFields.includes(option.value),
+        )
+      : ALL_FIELD_OPTIONS;
 
   const selectedEmployee = useMemo(
     () => users?.find((user) => user.id === employeeId),
